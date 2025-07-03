@@ -10,11 +10,14 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     // Version: 1.1
 
     event RMRTierChanged(address indexed user, uint256 newTier);
-    event TierRewardClaimed(address indexed user, uint8 tier);
+    event TierRewardClaimed(address indexed user, uint8 tier, uint256 amount);
     event TierRewardAmountChanged(uint256 indexed tier, uint256 amount);
     event EventRegenMint(address indexed user, uint256 baseAmount, uint256 finalAmount);
     // Event multiplier for event-based minting (basis points, 10000 = 1.0x)
     uint256 public eventMultiplier = 10000; // 10000 = 1.0x
+
+    address public pledgeFundWallet;
+    uint256 public pledgeRegenShare;
 
     struct RMRConfig {
         uint256 minDuration; // in days
@@ -84,9 +87,13 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     uint256 public userRegenShare;
     uint256 public daoRegenShare;
     uint256 public founderRegenShare;
+    uint256 public devRegenShare;
     uint256 public regenDecayShare; // % of burned MAQX that disappears (0 = no decay)
 
     uint256 public maxSeedRegens;
+
+    // Tracks pledge amount that is derived from seed-locked users (lockedBalance > 0)
+    uint256 public pledgeFromSeedDerived;
 
     mapping(address => uint256) public giftedBalance;
     mapping(address => uint256) public giftRewardQuota;
@@ -100,7 +107,7 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     mapping(address => uint8) public lastClaimedTier;
     mapping(uint256 => uint256) public tierRewards;
 
-    event RegenExecuted(address indexed user, uint256 totalRegen, uint256 userShare, uint256 daoShare, uint256 founderShare);
+    event RegenExecuted(address indexed user, uint256 totalRegen, uint256 userShare, uint256 daoShare, uint256 founderShare, uint256 devShare, uint256 pledgeShare);
     event SeedGranted(address indexed user);
     event GrantLockedDevToken(address indexed to, uint256 amount);
     event LockedTokensUnlocked(address indexed user);
@@ -150,7 +157,7 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     }
 
     function setRMRTierConfig(uint256 tier, uint256 minDurationDays, uint256 multiplier) external onlyOwner {
-        require(tier >= 1 && tier <= 5, "Tier must be 1–5");
+        require(tier >= 1 && tier <= 5, "Tier must be 1-5");
         require(multiplier <= 25, "Max multiplier is 25%");
         rmrTiers[tier] = RMRConfig(minDurationDays, multiplier);
     }
@@ -163,7 +170,7 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
             uint256 reward = tierRewards[tier];
             if (reward > 0) {
                 _transfer(globalMintWallet, msg.sender, reward);
-                emit TierRewardClaimed(msg.sender, tier, reward);
+                emit TierRewardClaimed(msg.sender, uint8(tier), reward);
             }
         }
 
@@ -194,9 +201,10 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         _mint(developerPoolWallet, DEV_POOL);
 
         regenCapPercent = 60;
-        userRegenShare = 80;
-        daoRegenShare = 10;
-        founderRegenShare = 10;
+        userRegenShare = 50;
+        daoRegenShare = 4;
+        founderRegenShare = 4;
+        devRegenShare = 2;
         maxSeedRegens = 1; // Default: allow 1 full regen for seed token
         regenDecayShare = 0;
 
@@ -213,6 +221,9 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         tierRewards[3] = 1e18;
         tierRewards[4] = 1e18;
         tierRewards[5] = 1e18;
+
+        pledgeFundWallet = 0x95Bc0be1892c9B040880A90D4Ef94BD33BCFAEe2;
+        pledgeRegenShare = 10;
     }
 
     function grantSeed(address user) external onlyOwner {
@@ -255,22 +266,33 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
             seedBurned[user] -= toRegen;
             seedRegenerated[user] += toRegen;
             _mint(user, toRegen);
+            lockedBalance[user] += toRegen;
             return;
         }
 
         uint256 baseUserAmt = (regenAmount * 50) / 100;
         uint256 rmrBonus = (baseUserAmt * getRMRMultiplier(user)) / 100;
         uint256 userAmt = baseUserAmt + rmrBonus;
-        uint256 daoAmt = (regenAmount * 10) / 100;
-        uint256 founderAmt = (regenAmount * 10) / 100;
-        uint256 globalAmt = regenAmount - userAmt - daoAmt - founderAmt;
+        uint256 daoAmt = (regenAmount * 4) / 100;
+        uint256 founderAmt = (regenAmount * 4) / 100;
+        uint256 devAmt = (regenAmount * 2) / 100;
+        uint256 pledgeAmt = (regenAmount * pledgeRegenShare) / 100;
+        uint256 globalAmt = regenAmount - userAmt - daoAmt - founderAmt - devAmt - pledgeAmt;
 
         _mint(user, userAmt);
+        if (lockedBalance[user] > 0) {
+            lockedBalance[user] += userAmt;
+        }
         _mint(daoTreasuryWallet, daoAmt);
         _mint(founderWallet, founderAmt);
+        _mint(developerPoolWallet, devAmt);
+        _mint(pledgeFundWallet, pledgeAmt);
+        if (lockedBalance[user] > 0) {
+            pledgeFromSeedDerived += pledgeAmt;
+        }
         _mint(globalMintWallet, globalAmt);
 
-        emit RegenExecuted(user, amountBurned, userAmt, daoAmt, founderAmt);
+        emit RegenExecuted(user, amountBurned, userAmt, daoAmt, founderAmt, devAmt, pledgeAmt);
     }
 
     function updateWallets(address _dev, address _founder, address _dao) external onlyOwner {
@@ -279,11 +301,13 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         daoTreasuryWallet = _dao;
     }
 
-    function updateRegenShares(uint256 userShare, uint256 daoShare, uint256 founderShare) external onlyOwner {
-        require(userShare + daoShare + founderShare == 100, "Invalid shares");
+    function updateRegenShares(uint256 userShare, uint256 daoShare, uint256 founderShare, uint256 devShare, uint256 pledgeShare) external onlyOwner {
+        require(userShare + daoShare + founderShare + devShare + pledgeShare == 100, "Invalid shares");
         userRegenShare = userShare;
         daoRegenShare = daoShare;
         founderRegenShare = founderShare;
+        devRegenShare = devShare;
+        pledgeRegenShare = pledgeShare;
     }
 
     function updateMaxSeedRegens(uint256 newMax) external onlyOwner {
@@ -361,26 +385,37 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
                 seedBurned[user] -= toRegen;
                 seedRegenerated[user] += toRegen;
                 _mint(user, toRegen);
+                lockedBalance[user] += toRegen;
             } else {
-                // Compute user shares with different multipliers for normal/event
-                // 50% of each pool is base, then apply RMR bonus (normal) and eventRMRBonus (event)
-                uint256 baseNormal = (normalAmt * 50) / 100;
-                uint256 normalBonus = (baseNormal * getRMRMultiplier(user)) / 100;
-                uint256 baseEvent = (eventAmt * 50) / 100;
-                uint256 eventBonus = (baseEvent * eventRMRBonus) / 100;
-                uint256 userAmt = baseNormal + normalBonus + baseEvent + eventBonus;
+            // Compute user shares with different multipliers for normal/event
+            // 50% of each pool is base, then apply RMR bonus (normal) and eventRMRBonus (event)
+            uint256 baseNormal = (normalAmt * 50) / 100;
+            uint256 normalBonus = (baseNormal * getRMRMultiplier(user)) / 100;
+            uint256 baseEvent = (eventAmt * 50) / 100;
+            uint256 eventBonus = (baseEvent * eventRMRBonus) / 100;
+            uint256 userAmt = baseNormal + normalBonus + baseEvent + eventBonus;
 
-                // DAO / Founder / Global shares from full decayed regenAmount
-                uint256 daoAmt = (regenAmount * 10) / 100;
-                uint256 founderAmt = (regenAmount * 10) / 100;
-                uint256 globalAmt = regenAmount - userAmt - daoAmt - founderAmt;
+            // DAO / Founder / Dev / Pledge / Global shares from full decayed regenAmount
+            uint256 daoAmt = (regenAmount * 4) / 100;
+            uint256 founderAmt = (regenAmount * 4) / 100;
+            uint256 devAmt = (regenAmount * 2) / 100;
+            uint256 pledgeAmt = (regenAmount * pledgeRegenShare) / 100;
+            uint256 globalAmt = regenAmount - userAmt - daoAmt - founderAmt - devAmt - pledgeAmt;
 
-                _mint(user, userAmt);
-                _mint(daoTreasuryWallet, daoAmt);
-                _mint(founderWallet, founderAmt);
-                _mint(globalMintWallet, globalAmt);
+            _mint(user, userAmt);
+            if (lockedBalance[user] > 0) {
+                lockedBalance[user] += userAmt;
+            }
+            _mint(daoTreasuryWallet, daoAmt);
+            _mint(founderWallet, founderAmt);
+            _mint(developerPoolWallet, devAmt);
+            _mint(pledgeFundWallet, pledgeAmt);
+            if (lockedBalance[user] > 0) {
+                pledgeFromSeedDerived += pledgeAmt;
+            }
+            _mint(globalMintWallet, globalAmt);
 
-                emit RegenExecuted(user, totalBurned, userAmt, daoAmt, founderAmt);
+            emit RegenExecuted(user, totalBurned, userAmt, daoAmt, founderAmt, devAmt, pledgeAmt);
             }
             // Clear both pools and user flag
             pendingRegen[user] = 0;
@@ -541,8 +576,23 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     // - Delegated regen authority
     // - LP-based unlock logic
     // - beginMigrationTo(address newChainBridge)
-}
 
+    /// @notice Sends MAQX from the Global Pledge Fund Wallet to a specified recipient.
+    /// This allows the founder to fund approved community or impact projects manually.
+    function spendFromPledgeFund(address to, uint256 amount, string calldata reason) external onlyOwner {
+        require(to != address(0), "Invalid recipient");
+        require(amount <= getSpendablePledgeFunds(), "Insufficient unlocked pledge funds");
+        _transfer(pledgeFundWallet, to, amount);
+        emit PledgeFundSpent(to, amount, reason);
+    }
+
+    /// @notice Emitted when MAQX is spent from the Global Pledge Fund Wallet for a cause or project.
+    event PledgeFundSpent(address indexed to, uint256 amount, string reason);
+
+    /// @notice Returns the amount of pledge funds that are not derived from locked/seed users and are available to spend.
+    function getSpendablePledgeFunds() public view returns (uint256) {
+        return balanceOf(pledgeFundWallet) - pledgeFromSeedDerived;
+    }
     /**
      * @notice Sets the event multiplier (in basis points, e.g. 15000 = 1.5x).
      * Only callable by the contract owner (founder).
@@ -552,3 +602,4 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     }
 
     // eventRegenMint moved and refactored above for batch logic
+}
