@@ -358,6 +358,53 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         emit EventRegenMint(user, baseAmount, finalAmount);
     }
 
+    function _handleSeedRegen(address user, uint256 totalBurned) internal {
+        seedBurned[user] += totalBurned;
+        uint256 remaining = (maxSeedRegens * 1e18) - seedRegenerated[user];
+        uint256 toRegen = seedBurned[user] > remaining ? remaining : seedBurned[user];
+        seedBurned[user] -= toRegen;
+        seedRegenerated[user] += toRegen;
+        _mint(user, toRegen);
+        lockedBalance[user] += toRegen;
+    }
+
+    function _calculateUserReward(address user, uint256 normalAmt, uint256 eventAmt) internal view returns (uint256) {
+        uint256 baseNormal = (normalAmt * 50) / 100;
+        uint256 normalBonus = (baseNormal * getRMRMultiplier(user)) / 100;
+        uint256 baseEvent = (eventAmt * 50) / 100;
+        uint256 eventBonus = (baseEvent * eventRMRBonus) / 100;
+        return baseNormal + normalBonus + baseEvent + eventBonus;
+    }
+
+    function _mintRegenShares(address user, uint256 userAmt, uint256 regenAmount) internal {
+        uint256 daoAmt = (regenAmount * 4) / 100;
+        uint256 founderAmt = (regenAmount * 4) / 100;
+        uint256 devAmt = (regenAmount * 2) / 100;
+        uint256 pledgeAmt = (regenAmount * pledgeRegenShare) / 100;
+        uint256 globalAmt = regenAmount - userAmt - daoAmt - founderAmt - devAmt - pledgeAmt;
+
+        _mint(user, userAmt);
+        if (lockedBalance[user] > 0) {
+            lockedBalance[user] += userAmt;
+        }
+        _mint(daoTreasuryWallet, daoAmt);
+        _mint(founderWallet, founderAmt);
+        _mint(developerPoolWallet, devAmt);
+        _mint(pledgeFundWallet, pledgeAmt);
+        if (lockedBalance[user] > 0) {
+            pledgeFromSeedDerived += pledgeAmt;
+        }
+        _mint(globalMintWallet, globalAmt);
+
+        emit RegenExecuted(user, userAmt + daoAmt + founderAmt + devAmt + pledgeAmt + globalAmt, userAmt, daoAmt, founderAmt, devAmt, pledgeAmt);
+    }
+
+    function _finalizeRegenBatch(address user) internal {
+        pendingRegen[user] = 0;
+        pendingEventRegen[user] = 0;
+        regenUsers[user] = false;
+    }
+
     /**
      * @dev Batch mint regen for all users with pending amounts (normal and event).
      * Applies different RMR multipliers for normal and event pools.
@@ -366,64 +413,32 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     function regenAllEligible() external onlyOwner onlyAfterRegenInterval {
         for (uint256 i = 0; i < regenUserList.length; i++) {
             address user = regenUserList[i];
-            uint256 normalAmt = pendingRegen[user];
-            uint256 eventAmt = pendingEventRegen[user];
-            uint256 totalBurned = normalAmt + eventAmt;
-            if (totalBurned == 0) continue;
-
-            _updateRMRTier(user);
-
-            // Apply decay to the combined total
-            uint256 decayedAmt = (totalBurned * regenDecayShare) / 100;
-            uint256 regenAmount = totalBurned - decayedAmt;
-
-            // If user is in seed mode, handle legacy regen (does not use event pool logic)
-            if (hasReceivedSeed[user] && seedRegenerated[user] < maxSeedRegens * 1e18) {
-                seedBurned[user] += totalBurned;
-                uint256 remaining = (maxSeedRegens * 1e18) - seedRegenerated[user];
-                uint256 toRegen = seedBurned[user] > remaining ? remaining : seedBurned[user];
-                seedBurned[user] -= toRegen;
-                seedRegenerated[user] += toRegen;
-                _mint(user, toRegen);
-                lockedBalance[user] += toRegen;
-            } else {
-            // Compute user shares with different multipliers for normal/event
-            // 50% of each pool is base, then apply RMR bonus (normal) and eventRMRBonus (event)
-            uint256 baseNormal = (normalAmt * 50) / 100;
-            uint256 normalBonus = (baseNormal * getRMRMultiplier(user)) / 100;
-            uint256 baseEvent = (eventAmt * 50) / 100;
-            uint256 eventBonus = (baseEvent * eventRMRBonus) / 100;
-            uint256 userAmt = baseNormal + normalBonus + baseEvent + eventBonus;
-
-            // DAO / Founder / Dev / Pledge / Global shares from full decayed regenAmount
-            uint256 daoAmt = (regenAmount * 4) / 100;
-            uint256 founderAmt = (regenAmount * 4) / 100;
-            uint256 devAmt = (regenAmount * 2) / 100;
-            uint256 pledgeAmt = (regenAmount * pledgeRegenShare) / 100;
-            uint256 globalAmt = regenAmount - userAmt - daoAmt - founderAmt - devAmt - pledgeAmt;
-
-            _mint(user, userAmt);
-            if (lockedBalance[user] > 0) {
-                lockedBalance[user] += userAmt;
-            }
-            _mint(daoTreasuryWallet, daoAmt);
-            _mint(founderWallet, founderAmt);
-            _mint(developerPoolWallet, devAmt);
-            _mint(pledgeFundWallet, pledgeAmt);
-            if (lockedBalance[user] > 0) {
-                pledgeFromSeedDerived += pledgeAmt;
-            }
-            _mint(globalMintWallet, globalAmt);
-
-            emit RegenExecuted(user, totalBurned, userAmt, daoAmt, founderAmt, devAmt, pledgeAmt);
-            }
-            // Clear both pools and user flag
-            pendingRegen[user] = 0;
-            pendingEventRegen[user] = 0;
-            regenUsers[user] = false;
+            _processUserRegen(user, pendingRegen[user], pendingEventRegen[user]);
         }
+
         delete regenUserList;
         lastRegenTimestamp = block.timestamp;
+    }
+
+    /**
+     * @dev Internal helper to process a single user's regen logic.
+     */
+    function _processUserRegen(address user, uint256 normalAmt, uint256 eventAmt) internal {
+        uint256 totalBurned = normalAmt + eventAmt;
+        if (totalBurned == 0) return;
+
+        _updateRMRTier(user);
+
+        if (hasReceivedSeed[user] && seedRegenerated[user] < maxSeedRegens * 1e18) {
+            _handleSeedRegen(user, totalBurned);
+        } else {
+            uint256 decayedAmt = (totalBurned * regenDecayShare) / 100;
+            uint256 regenAmount = totalBurned - decayedAmt;
+            uint256 userAmt = _calculateUserReward(user, normalAmt, eventAmt);
+            _mintRegenShares(user, userAmt, regenAmount);
+        }
+
+        _finalizeRegenBatch(user);
     }
 
     function transferWithOptionalLock(address to, uint256 amount, bool lock, uint256 lockDurationDays) external {
