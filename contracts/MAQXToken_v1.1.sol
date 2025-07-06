@@ -6,15 +6,27 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
+// For debugging output
+import "hardhat/console.sol";
+
+interface IZKRegenVerifier {
+    function verifyProof(bytes calldata proof, address[] calldata users, uint256[] calldata amounts) external view returns (bool);
+}
+
 contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, OwnableUpgradeable {
+    /// @notice The zkVerifier contract address (public getter).
+    IZKRegenVerifier public zkVerifier;
     // Version: 1.1
+
+    // Tracks submitted ZK proof hashes to prevent re-use
+    mapping(bytes32 => bool) public usedZKProofs;
 
     event RMRTierChanged(address indexed user, uint256 newTier);
     event TierRewardClaimed(address indexed user, uint8 tier, uint256 amount);
     event TierRewardAmountChanged(uint256 indexed tier, uint256 amount);
     event EventRegenMint(address indexed user, uint256 baseAmount, uint256 finalAmount);
     // Event multiplier for event-based minting (basis points, 10000 = 1.0x)
-    uint256 public eventMultiplier = 10000; // 10000 = 1.0x
+    uint256 public eventMultiplier;
 
     address public pledgeFundWallet;
     uint256 public pledgeRegenShare;
@@ -30,24 +42,26 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     uint256 public constant MAX_SEED_REGEN = 1e18;
 
     // New action burn configuration parameters
-    uint256 public burnToSeedAmount = 0.1 ether;
-    uint256 public burnToWitnessAmount = 0.01 ether;
-    uint256 public burnToVerifyAmount = 0.1 ether;
+    uint256 public burnToSeedAmount;
+    uint256 public burnToWitnessAmount;
+    uint256 public burnToVerifyAmount;
 
     /// burnToContractAmount: reference parameter for contract-based actions (not yet active in logic)
-    uint256 public burnToContractAmount = 0.1 ether;
+    uint256 public burnToContractAmount;
 
     /// burnToActAmount and burnToCommitAmount mirror burnToSeedAmount
     /// Used only for tracking or UI display purposes — no distinct logic
-    uint256 public burnToActAmount = 0.1 ether;
-    uint256 public burnToCommitAmount = 0.1 ether;
-    uint256 public minWitnesses = 2;
-    uint256 public minVerifiers = 1;
+    uint256 public burnToActAmount;
+    uint256 public burnToCommitAmount;
+    uint256 public minWitnesses;
+    uint256 public minVerifiers;
 
     address public globalMintWallet;
     address public founderWallet;
     address public developerPoolWallet;
     address public daoTreasuryWallet;
+    address public zkDistributionWallet;
+    mapping(address => uint256) public claimableZKRegen;
 
     mapping(address => bool) public hasReceivedSeed;
     mapping(address => uint256) public seedBurned;
@@ -73,11 +87,13 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     // Regen batching tracking
     mapping(address => bool) private regenUsers;
     address[] private regenUserList;
-    uint256 public regenInterval = 1 days;
+    uint256 public regenInterval;
     uint256 public lastRegenTimestamp;
-    uint256 public regenThreshold = 0.2 ether;
+    uint256 public regenThreshold;
+    // Per-user regen cooldown tracking
+    mapping(address => uint256) public lastUserRegen;
     // Bonus multiplier for event-based regen (in percent, e.g. 10 = 10%)
-    uint256 public eventRMRBonus = 10; // Default: +10% bonus on event regen
+    uint256 public eventRMRBonus;
 
     mapping(address => uint256) public lockedBalance;
     mapping(address => uint256) public lockedUntil;
@@ -100,9 +116,9 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     mapping(address => uint256) public lastGiftTimestamp;
 
     // Added variables for RMR logic
-    uint256[] public rmrDurations = [0, 30 days, 90 days, 180 days, 270 days, 365 days];
-    uint256[] public rmrBonuses = [0, 5, 10, 15, 20, 25];
-    uint256[] public rmrMinBalances = [0, 4 ether, 12 ether, 30 ether, 60 ether, 100 ether];
+    uint256[] public rmrDurations;
+    uint256[] public rmrBonuses;
+    uint256[] public rmrMinBalances;
     mapping(address => uint256) public rmrStartTime;
     mapping(address => uint8) public lastClaimedTier;
     mapping(uint256 => uint256) public tierRewards;
@@ -131,10 +147,13 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         }
         uint256 heldDuration = (block.timestamp - rmrStartTime[user]) / 1 days;
         uint256 newTier = rmrTier[user];
-        for (uint256 i = 5; i >= 1; i--) {
+        for (uint256 i = 5; i >= 1; ) {
             if (heldDuration >= rmrTiers[i].minDuration) {
                 newTier = i;
                 break;
+            }
+            unchecked {
+                i--;
             }
         }
         if (newTier != rmrTier[user]) {
@@ -143,14 +162,20 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         }
     }
 
-    // Updated getRMRMultiplier function to compute tier automatically
+    // Updated getRMRMultiplier function with safety guard to prevent out-of-bounds errors
     function getRMRMultiplier(address user) public view returns (uint256) {
+        uint256 len = rmrDurations.length;
+        if (len == 0 || rmrBonuses.length != len || rmrMinBalances.length != len) {
+            return 0;
+        }
         uint256 userBalance = balanceOf(user);
         uint256 heldTime = block.timestamp - rmrStartTime[user];
 
-        for (uint256 i = rmrDurations.length - 1; i > 0; i--) {
-            if (heldTime >= rmrDurations[i] && userBalance >= rmrMinBalances[i]) {
-                return rmrBonuses[i];
+        unchecked {
+            for (uint256 i = len - 1; i > 0; i--) {
+                if (heldTime >= rmrDurations[i] && userBalance >= rmrMinBalances[i]) {
+                    return rmrBonuses[i];
+                }
             }
         }
         return rmrBonuses[0];
@@ -222,14 +247,33 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         tierRewards[4] = 1e18;
         tierRewards[5] = 1e18;
 
+        // Set configurable parameters previously initialized at declaration
+        eventMultiplier = 10000;
+        burnToSeedAmount = 0.1 ether;
+        burnToWitnessAmount = 0.01 ether;
+        burnToVerifyAmount = 0.1 ether;
+        burnToContractAmount = 0.1 ether;
+        burnToActAmount = 0.1 ether;
+        burnToCommitAmount = 0.1 ether;
+        minWitnesses = 2;
+        minVerifiers = 1;
+        regenInterval = 1 days;
+        regenThreshold = 0.2 ether;
+        eventRMRBonus = 10;
+        rmrDurations = [0, 30 days, 90 days, 180 days, 270 days, 365 days];
+        rmrBonuses = [0, 5, 10, 15, 20, 25];
+        rmrMinBalances = [0, 4 ether, 12 ether, 30 ether, 60 ether, 100 ether];
+
         pledgeFundWallet = 0x95Bc0be1892c9B040880A90D4Ef94BD33BCFAEe2;
         pledgeRegenShare = 10;
+        zkDistributionWallet = 0x5543332C405A3Cbbf7EeeAe91b410FD06213135b;
     }
 
     function grantSeed(address user) external onlyOwner {
         require(!hasReceivedSeed[user], "Seed already granted");
         hasReceivedSeed[user] = true;
         _transfer(globalMintWallet, user, 1e18);
+        // lockedBalance[user] += 1e18; // Removed to prevent premature locking of the seed
         rmrStartTime[user] = block.timestamp;
         emit SeedGranted(user);
     }
@@ -259,6 +303,14 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         uint256 decayedAmt = (amountBurned * regenDecayShare) / 100;
         uint256 regenAmount = amountBurned - decayedAmt;
 
+        // Debug: Output regen computation info
+        console.log("REGEN_DEBUG");
+        console.log("user", user);
+        console.log("burned", amountBurned);
+        console.log("seedBurned", seedBurned[user]);
+        console.log("seedRegenerated", seedRegenerated[user]);
+        console.log("regenAmount", regenAmount);
+
         if (hasReceivedSeed[user] && seedRegenerated[user] < maxSeedRegens * 1e18) {
             seedBurned[user] += amountBurned;
             uint256 remaining = (maxSeedRegens * 1e18) - seedRegenerated[user];
@@ -267,6 +319,8 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
             seedRegenerated[user] += toRegen;
             _mint(user, toRegen);
             lockedBalance[user] += toRegen;
+            // DEBUG: seed-only mint
+            console.log("DEBUG: seed-only mint %s to %s", toRegen, user);
             return;
         }
 
@@ -278,6 +332,15 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         uint256 devAmt = (regenAmount * 2) / 100;
         uint256 pledgeAmt = (regenAmount * pledgeRegenShare) / 100;
         uint256 globalAmt = regenAmount - userAmt - daoAmt - founderAmt - devAmt - pledgeAmt;
+
+        // Debug: Output regen split info
+        console.log("REGEN_SPLIT");
+        console.log("userAmt", userAmt);
+        console.log("daoAmt", daoAmt);
+        console.log("founderAmt", founderAmt);
+        console.log("devAmt", devAmt);
+        console.log("pledgeAmt", pledgeAmt);
+        console.log("globalAmt", globalAmt);
 
         _mint(user, userAmt);
         if (lockedBalance[user] > 0) {
@@ -328,6 +391,11 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     // Regen batching logic
     modifier onlyAfterRegenInterval() {
         require(block.timestamp >= lastRegenTimestamp + regenInterval, "Regen not yet available");
+        _;
+    }
+    // Per-user regen interval modifier
+    modifier onlyUserRegenInterval(address user) {
+        require(block.timestamp >= lastUserRegen[user] + regenInterval, "User regen not yet available");
         _;
     }
 
@@ -406,26 +474,15 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     }
 
     /**
-     * @dev Batch mint regen for all users with pending amounts (normal and event).
-     * Applies different RMR multipliers for normal and event pools.
-     * Can only be called once per regenInterval.
+     * @dev Allows a user to trigger their own regen if they have pending burns.
+     * Enforces per-user cooldown via onlyUserRegenInterval.
      */
-    function regenAllEligible() external onlyOwner onlyAfterRegenInterval {
-        for (uint256 i = 0; i < regenUserList.length; i++) {
-            address user = regenUserList[i];
-            _processUserRegen(user, pendingRegen[user], pendingEventRegen[user]);
-        }
-
-        delete regenUserList;
-        lastRegenTimestamp = block.timestamp;
-    }
-
-    /**
-     * @dev Internal helper to process a single user's regen logic.
-     */
-    function _processUserRegen(address user, uint256 normalAmt, uint256 eventAmt) internal {
+    function regenMyPending() external onlyUserRegenInterval(msg.sender) {
+        address user = msg.sender;
+        uint256 normalAmt = pendingRegen[user];
+        uint256 eventAmt = pendingEventRegen[user];
         uint256 totalBurned = normalAmt + eventAmt;
-        if (totalBurned == 0) return;
+        require(totalBurned > 0, "No pending regen");
 
         _updateRMRTier(user);
 
@@ -439,7 +496,10 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         }
 
         _finalizeRegenBatch(user);
+        lastUserRegen[user] = block.timestamp;
     }
+
+    // _processUserRegen is no longer used by batch logic, but may remain for internal use if needed.
 
     function transferWithOptionalLock(address to, uint256 amount, bool lock, uint256 lockDurationDays) external {
         _transfer(msg.sender, to, amount);
@@ -450,21 +510,31 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
 
     function _update(address from, address to, uint256 value) internal override {
         if (from != address(0)) {
-            require(
-                balanceOf(from) - lockedBalance[from] >= value &&
-                block.timestamp >= lockedUntil[from],
-                "Attempting to transfer locked or time-locked tokens"
-            );
+            uint256 unlocked = balanceOf(from) - lockedBalance[from];
+            // DEBUG: transfer lock check
+            console.log("DEBUG: balance", balanceOf(from));
+            console.log("DEBUG: locked", lockedBalance[from]);
+            console.log("DEBUG: unlocked", balanceOf(from) - lockedBalance[from]);
+            console.log("DEBUG: attempting transfer", value);
+            require(value <= unlocked, "Cannot transfer locked tokens");
         }
+
         super._update(from, to, value);
+
+        uint256 len = rmrDurations.length;
+        if (len == 0 || rmrBonuses.length != len || rmrMinBalances.length != len) {
+            return;
+        }
 
         uint256 newBalance = balanceOf(to);
         uint256 currentTier = getRMRMultiplier(to);
 
-        if (newBalance < rmrMinBalances[currentTier]) {
+        if (currentTier < rmrMinBalances.length && newBalance < rmrMinBalances[currentTier]) {
             rmrStartTime[to] = block.timestamp;
         }
     }
+
+
 
     function gift(address to, uint256 amount) external {
         _transfer(msg.sender, to, amount);
@@ -501,7 +571,7 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     /**
      * @notice Burn tokens to perform an act action.
      */
-    function act() external {
+    function act() external payable {
         _burn(msg.sender, burnToActAmount);
         seedRegenMint(msg.sender, burnToActAmount);
         emit ActionBurned(msg.sender, "act", burnToActAmount);
@@ -596,7 +666,9 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     /// This allows the founder to fund approved community or impact projects manually.
     function spendFromPledgeFund(address to, uint256 amount, string calldata reason) external onlyOwner {
         require(to != address(0), "Invalid recipient");
-        require(amount <= getSpendablePledgeFunds(), "Insufficient unlocked pledge funds");
+        uint256 pledgeBalance = balanceOf(pledgeFundWallet);
+        uint256 unlocked = pledgeBalance > pledgeFromSeedDerived ? pledgeBalance - pledgeFromSeedDerived : 0;
+        require(unlocked >= amount, "Insufficient unlocked pledge funds");
         _transfer(pledgeFundWallet, to, amount);
         emit PledgeFundSpent(to, amount, reason);
     }
@@ -617,4 +689,95 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     }
 
     // eventRegenMint moved and refactored above for batch logic
+    /**
+     * @notice Sets the ZK regen verifier contract address.
+     * Only callable by the contract owner (founder).
+     */
+    function setZKVerifier(address verifier) external onlyOwner {
+        zkVerifier = IZKRegenVerifier(verifier);
+    }
+
+    /**
+     * @notice ZK-based regen minting (batch): Mints total user share to zkDistributionWallet.
+     * Users must later claim their regen using claimZKRegen().
+     * Other ecosystem shares (DAO, founder, dev, pledge) are minted directly.
+     * @param proof The zk-proof bytes.
+     * @param users The list of user addresses to mint to.
+     * @param amounts The corresponding regen amounts per user.
+     */
+    function mintFromZKProof(bytes calldata proof, address[] calldata users, uint256[] calldata amounts) external onlyOwner {
+        require(users.length == amounts.length, "Mismatched input lengths");
+        require(zkVerifier != IZKRegenVerifier(address(0)), "Verifier not set");
+
+        // Compute hash of proof, users, and amounts to checkpoint against re-use
+        bytes32 proofHash = keccak256(abi.encodePacked(proof, users, amounts));
+        require(!usedZKProofs[proofHash], "ZK proof already used");
+        usedZKProofs[proofHash] = true;
+        // zkVerifier address is checked above via "require(zkVerifier != IZKRegenVerifier(address(0)), "Verifier not set");"
+
+        bool isValid = zkVerifier.verifyProof(proof, users, amounts);
+        require(isValid, "Invalid zk proof");
+
+        uint256 totalUserAmt = 0;
+        uint256 totalDaoAmt = 0;
+        uint256 totalFounderAmt = 0;
+        uint256 totalDevAmt = 0;
+        uint256 totalPledgeAmt = 0;
+        uint256 totalGlobalAmt = 0;
+
+        for (uint256 i = 0; i < users.length; i++) {
+            address user = users[i];
+            uint256 amountBurned = amounts[i];
+            require(amountBurned > 0, "Invalid amount");
+
+            _updateRMRTier(user);
+
+            if (hasReceivedSeed[user] && seedRegenerated[user] < maxSeedRegens * 1e18) {
+                // Seed user with remaining regen: handle locked minting and update tracking
+                _handleSeedRegen(user, amountBurned);
+                // For seed users, emit RegenExecuted event with only the amount minted to user (locked), others are zero
+                emit RegenExecuted(user, amountBurned, amountBurned, 0, 0, 0, 0);
+            } else {
+                // Normal user: apply decay, calculate split, accumulate for batch minting
+                uint256 decayedAmt = (amountBurned * regenDecayShare) / 100;
+                uint256 regenAmount = amountBurned - decayedAmt;
+                uint256 userAmt = _calculateUserReward(user, amountBurned, 0); // Only normal burns here
+                claimableZKRegen[user] += userAmt;
+                totalUserAmt += userAmt;
+                uint256 daoAmt = (regenAmount * 4) / 100;
+                uint256 founderAmt = (regenAmount * 4) / 100;
+                uint256 devAmt = (regenAmount * 2) / 100;
+                uint256 pledgeAmt = (regenAmount * pledgeRegenShare) / 100;
+                uint256 globalAmt = regenAmount - userAmt - daoAmt - founderAmt - devAmt - pledgeAmt;
+                totalDaoAmt += daoAmt;
+                totalFounderAmt += founderAmt;
+                totalDevAmt += devAmt;
+                totalPledgeAmt += pledgeAmt;
+                totalGlobalAmt += globalAmt;
+                emit RegenExecuted(user, regenAmount, userAmt, daoAmt, founderAmt, devAmt, pledgeAmt);
+            }
+
+            pendingRegen[user] = 0;
+            pendingEventRegen[user] = 0;
+            regenUsers[user] = false;
+            lastUserRegen[user] = block.timestamp;
+        }
+
+        // Batch mint: user regen share goes to zkDistributionWallet (not directly to user)
+        if (totalUserAmt > 0) _mint(zkDistributionWallet, totalUserAmt);
+        if (totalDaoAmt > 0) _mint(daoTreasuryWallet, totalDaoAmt);
+        if (totalFounderAmt > 0) _mint(founderWallet, totalFounderAmt);
+        if (totalDevAmt > 0) _mint(developerPoolWallet, totalDevAmt);
+        if (totalPledgeAmt > 0) _mint(pledgeFundWallet, totalPledgeAmt);
+        if (totalGlobalAmt > 0) _mint(globalMintWallet, totalGlobalAmt);
+
+        lastRegenTimestamp = block.timestamp;
+    }
+
+    function claimZKRegen() external {
+        uint256 amount = claimableZKRegen[msg.sender];
+        require(amount > 0, "No claimable regen");
+        claimableZKRegen[msg.sender] = 0;
+        _transfer(zkDistributionWallet, msg.sender, amount);
+    }
 }

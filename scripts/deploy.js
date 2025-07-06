@@ -6,6 +6,10 @@ async function main() {
   const MAQXToken = await ethers.getContractFactory("MAQXToken");
 
   console.log("🧪 GLOBAL_MINT_WALLET:", process.env.GLOBAL_MINT_WALLET);
+  console.log("📦 PLEDGE_FUND_WALLET:", process.env.PLEDGE_FUND_WALLET);
+  // console.log("📦 PLEDGE_FUND_WALLET:", process.env.PLEDGE_FUND_WALLET);
+  // console.log("🔐 ZK_DISTRIBUTION_WALLET:", process.env.ZK_DISTRIBUTION_WALLET);
+  // console.log("🔐 ZK_DISTRIBUTION_WALLET:", process.env.ZK_DISTRIBUTION_WALLET);
 
   const maqx = await upgrades.deployProxy(
     MAQXToken,
