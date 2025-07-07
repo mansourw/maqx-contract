@@ -1,987 +1,548 @@
 {
   "manifestVersion": "3.2",
-  "proxies": [
-    {
-      "address": "0x8E558A92aF0339C9f550aE4c3124071F5fA2c7a3",
-      "txHash": "0x6d710098acf6c654130f45da9e01b38d94de8dc8983fbd897987bfb7318d6eea",
-      "kind": "transparent"
-    },
-    {
-      "address": "0x5AdC937465Cf93D17dB670A682Ee1bfc3c6F24E2",
-      "txHash": "0xa23aa109ab05d4aa088c0d2bb53f58d236a3c823b660a645bfc9228dd4ed84ba",
-      "kind": "transparent"
-    },
-    {
-      "address": "0x1f57Fc18330eDc409897Fe3C399cAF5aa5D1B55c",
-      "txHash": "0xad3b1bb08714c7b24e733736f7d314911714c76e80c5fd853bfb4394f55a8740",
-      "kind": "transparent"
-    },
-    {
-      "address": "0x7544eB20Cf05779898f3C2113010ebeA4e7d957E",
-      "txHash": "0x4e074fa16adb19a9f7a851830feeff4a21d6602edd88ae6fa26e120924d3875c",
-      "kind": "transparent"
-    }
-  ],
+  "proxies": [],
   "impls": {
-    "6b698dfb8de035946a2d76277d80944dbf7ab27301a6cad52ebe591fd96a8a10": {
-      "address": "0xC668C9e29617d505eA11a4f67F398764dBaFdeB1",
-      "txHash": "0x11dc008c00099db3998274c7f3f4e8329e99a3f9522ca82396cc32e6af9e1502",
+    "d9f9a6b8326dfb3194558389126478f407bd00a8bd8e8c93f5e7cfdaa8d05fc4": {
+      "address": "0x87e55C10671764c3C4885985Fd2b763EDE96de3D",
+      "txHash": "0x3da77c09e95b63b4e94ad06b72f3eac742fe46cb409e222f6e7834b76a3f725f",
       "layout": {
         "solcVersion": "0.8.20",
         "storage": [
           {
-            "label": "globalMintWallet",
+            "label": "founder",
             "offset": 0,
             "slot": "0",
             "type": "t_address",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:18"
+            "src": "contracts/MAQXToken_v1.1.sol:28"
           },
           {
-            "label": "founderWallet",
+            "label": "rmrInterval",
             "offset": 0,
             "slot": "1",
-            "type": "t_address",
+            "type": "t_uint256",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:19"
+            "src": "contracts/MAQXToken_v1.1.sol:35"
           },
           {
-            "label": "developerPoolWallet",
+            "label": "lastRegen",
             "offset": 0,
             "slot": "2",
-            "type": "t_address",
+            "type": "t_mapping(t_address,t_uint256)",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:20"
+            "src": "contracts/MAQXToken_v1.1.sol:36"
           },
           {
-            "label": "daoTreasuryWallet",
+            "label": "eligibleUsers",
             "offset": 0,
             "slot": "3",
-            "type": "t_address",
+            "type": "t_array(t_address)dyn_storage",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:21"
+            "src": "contracts/MAQXToken_v1.1.sol:37"
           },
           {
-            "label": "hasReceivedSeed",
+            "label": "_lastTransferTimestamp",
             "offset": 0,
             "slot": "4",
-            "type": "t_mapping(t_address,t_bool)",
+            "type": "t_mapping(t_address,t_uint256)",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:24"
+            "src": "contracts/MAQXToken_v1.1.sol:40"
           },
           {
-            "label": "regenCapPercent",
+            "label": "transferDelay",
             "offset": 0,
             "slot": "5",
             "type": "t_uint256",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:27"
+            "src": "contracts/MAQXToken_v1.1.sol:41"
           },
           {
-            "label": "userRegenShare",
+            "label": "_isExcludedFromLimits",
             "offset": 0,
             "slot": "6",
-            "type": "t_uint256",
+            "type": "t_mapping(t_address,t_bool)",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:28"
+            "src": "contracts/MAQXToken_v1.1.sol:42"
           },
           {
-            "label": "daoRegenShare",
+            "label": "globalCooldownTime",
             "offset": 0,
             "slot": "7",
             "type": "t_uint256",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:29"
+            "src": "contracts/MAQXToken_v1.1.sol:43"
           },
           {
-            "label": "founderRegenShare",
+            "label": "maxSellPercent",
             "offset": 0,
             "slot": "8",
             "type": "t_uint256",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:30"
+            "src": "contracts/MAQXToken_v1.1.sol:44"
           },
           {
-            "label": "lockedBalance",
+            "label": "isExcludedFromLimit",
             "offset": 0,
             "slot": "9",
-            "type": "t_mapping(t_address,t_uint256)",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:33"
-          }
-        ],
-        "types": {
-          "t_address": {
-            "label": "address",
-            "numberOfBytes": "20"
-          },
-          "t_bool": {
-            "label": "bool",
-            "numberOfBytes": "1"
-          },
-          "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
-            "label": "mapping(address => mapping(address => uint256))",
-            "numberOfBytes": "32"
-          },
-          "t_mapping(t_address,t_uint256)": {
-            "label": "mapping(address => uint256)",
-            "numberOfBytes": "32"
-          },
-          "t_string_storage": {
-            "label": "string",
-            "numberOfBytes": "32"
-          },
-          "t_struct(ERC20Storage)159_storage": {
-            "label": "struct ERC20Upgradeable.ERC20Storage",
-            "members": [
-              {
-                "label": "_balances",
-                "type": "t_mapping(t_address,t_uint256)",
-                "offset": 0,
-                "slot": "0"
-              },
-              {
-                "label": "_allowances",
-                "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
-                "offset": 0,
-                "slot": "1"
-              },
-              {
-                "label": "_totalSupply",
-                "type": "t_uint256",
-                "offset": 0,
-                "slot": "2"
-              },
-              {
-                "label": "_name",
-                "type": "t_string_storage",
-                "offset": 0,
-                "slot": "3"
-              },
-              {
-                "label": "_symbol",
-                "type": "t_string_storage",
-                "offset": 0,
-                "slot": "4"
-              }
-            ],
-            "numberOfBytes": "160"
-          },
-          "t_struct(InitializableStorage)73_storage": {
-            "label": "struct Initializable.InitializableStorage",
-            "members": [
-              {
-                "label": "_initialized",
-                "type": "t_uint64",
-                "offset": 0,
-                "slot": "0"
-              },
-              {
-                "label": "_initializing",
-                "type": "t_bool",
-                "offset": 8,
-                "slot": "0"
-              }
-            ],
-            "numberOfBytes": "32"
-          },
-          "t_struct(OwnableStorage)13_storage": {
-            "label": "struct OwnableUpgradeable.OwnableStorage",
-            "members": [
-              {
-                "label": "_owner",
-                "type": "t_address",
-                "offset": 0,
-                "slot": "0"
-              }
-            ],
-            "numberOfBytes": "32"
-          },
-          "t_uint256": {
-            "label": "uint256",
-            "numberOfBytes": "32"
-          },
-          "t_uint64": {
-            "label": "uint64",
-            "numberOfBytes": "8"
-          },
-          "t_mapping(t_address,t_bool)": {
-            "label": "mapping(address => bool)",
-            "numberOfBytes": "32"
-          }
-        },
-        "namespaces": {
-          "erc7201:openzeppelin.storage.Ownable": [
-            {
-              "contract": "OwnableUpgradeable",
-              "label": "_owner",
-              "type": "t_address",
-              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
-              "offset": 0,
-              "slot": "0"
-            }
-          ],
-          "erc7201:openzeppelin.storage.ERC20": [
-            {
-              "contract": "ERC20Upgradeable",
-              "label": "_balances",
-              "type": "t_mapping(t_address,t_uint256)",
-              "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:33",
-              "offset": 0,
-              "slot": "0"
-            },
-            {
-              "contract": "ERC20Upgradeable",
-              "label": "_allowances",
-              "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
-              "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:35",
-              "offset": 0,
-              "slot": "1"
-            },
-            {
-              "contract": "ERC20Upgradeable",
-              "label": "_totalSupply",
-              "type": "t_uint256",
-              "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:37",
-              "offset": 0,
-              "slot": "2"
-            },
-            {
-              "contract": "ERC20Upgradeable",
-              "label": "_name",
-              "type": "t_string_storage",
-              "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:39",
-              "offset": 0,
-              "slot": "3"
-            },
-            {
-              "contract": "ERC20Upgradeable",
-              "label": "_symbol",
-              "type": "t_string_storage",
-              "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:40",
-              "offset": 0,
-              "slot": "4"
-            }
-          ],
-          "erc7201:openzeppelin.storage.Initializable": [
-            {
-              "contract": "Initializable",
-              "label": "_initialized",
-              "type": "t_uint64",
-              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
-              "offset": 0,
-              "slot": "0"
-            },
-            {
-              "contract": "Initializable",
-              "label": "_initializing",
-              "type": "t_bool",
-              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
-              "offset": 8,
-              "slot": "0"
-            }
-          ]
-        }
-      }
-    },
-    "86e82aab3b7115b8f3f1668fb2df4ef0d39711642f076bfac57dd23faf652529": {
-      "address": "0x1D597E7Bc08D8b5c975c06371df60fEc3eE3cC83",
-      "txHash": "0x8681349f1b1ec2c69474abfecc83fe706e84c91ae10830d5c74595fb673feadc",
-      "layout": {
-        "solcVersion": "0.8.20",
-        "storage": [
-          {
-            "label": "globalMintWallet",
-            "offset": 0,
-            "slot": "0",
-            "type": "t_address",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:18"
-          },
-          {
-            "label": "founderWallet",
-            "offset": 0,
-            "slot": "1",
-            "type": "t_address",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:19"
-          },
-          {
-            "label": "developerPoolWallet",
-            "offset": 0,
-            "slot": "2",
-            "type": "t_address",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:20"
-          },
-          {
-            "label": "daoTreasuryWallet",
-            "offset": 0,
-            "slot": "3",
-            "type": "t_address",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:21"
-          },
-          {
-            "label": "hasReceivedSeed",
-            "offset": 0,
-            "slot": "4",
             "type": "t_mapping(t_address,t_bool)",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:24"
-          },
-          {
-            "label": "regenCapPercent",
-            "offset": 0,
-            "slot": "5",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:27"
-          },
-          {
-            "label": "userRegenShare",
-            "offset": 0,
-            "slot": "6",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:28"
-          },
-          {
-            "label": "daoRegenShare",
-            "offset": 0,
-            "slot": "7",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:29"
-          },
-          {
-            "label": "founderRegenShare",
-            "offset": 0,
-            "slot": "8",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:30"
-          },
-          {
-            "label": "lockedBalance",
-            "offset": 0,
-            "slot": "9",
-            "type": "t_mapping(t_address,t_uint256)",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.0.sol:33"
-          }
-        ],
-        "types": {
-          "t_address": {
-            "label": "address",
-            "numberOfBytes": "20"
-          },
-          "t_bool": {
-            "label": "bool",
-            "numberOfBytes": "1"
-          },
-          "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
-            "label": "mapping(address => mapping(address => uint256))",
-            "numberOfBytes": "32"
-          },
-          "t_mapping(t_address,t_uint256)": {
-            "label": "mapping(address => uint256)",
-            "numberOfBytes": "32"
-          },
-          "t_string_storage": {
-            "label": "string",
-            "numberOfBytes": "32"
-          },
-          "t_struct(ERC20Storage)159_storage": {
-            "label": "struct ERC20Upgradeable.ERC20Storage",
-            "members": [
-              {
-                "label": "_balances",
-                "type": "t_mapping(t_address,t_uint256)",
-                "offset": 0,
-                "slot": "0"
-              },
-              {
-                "label": "_allowances",
-                "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
-                "offset": 0,
-                "slot": "1"
-              },
-              {
-                "label": "_totalSupply",
-                "type": "t_uint256",
-                "offset": 0,
-                "slot": "2"
-              },
-              {
-                "label": "_name",
-                "type": "t_string_storage",
-                "offset": 0,
-                "slot": "3"
-              },
-              {
-                "label": "_symbol",
-                "type": "t_string_storage",
-                "offset": 0,
-                "slot": "4"
-              }
-            ],
-            "numberOfBytes": "160"
-          },
-          "t_struct(InitializableStorage)73_storage": {
-            "label": "struct Initializable.InitializableStorage",
-            "members": [
-              {
-                "label": "_initialized",
-                "type": "t_uint64",
-                "offset": 0,
-                "slot": "0"
-              },
-              {
-                "label": "_initializing",
-                "type": "t_bool",
-                "offset": 8,
-                "slot": "0"
-              }
-            ],
-            "numberOfBytes": "32"
-          },
-          "t_struct(OwnableStorage)13_storage": {
-            "label": "struct OwnableUpgradeable.OwnableStorage",
-            "members": [
-              {
-                "label": "_owner",
-                "type": "t_address",
-                "offset": 0,
-                "slot": "0"
-              }
-            ],
-            "numberOfBytes": "32"
-          },
-          "t_uint256": {
-            "label": "uint256",
-            "numberOfBytes": "32"
-          },
-          "t_uint64": {
-            "label": "uint64",
-            "numberOfBytes": "8"
-          },
-          "t_mapping(t_address,t_bool)": {
-            "label": "mapping(address => bool)",
-            "numberOfBytes": "32"
-          }
-        },
-        "namespaces": {
-          "erc7201:openzeppelin.storage.Ownable": [
-            {
-              "contract": "OwnableUpgradeable",
-              "label": "_owner",
-              "type": "t_address",
-              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
-              "offset": 0,
-              "slot": "0"
-            }
-          ],
-          "erc7201:openzeppelin.storage.ERC20": [
-            {
-              "contract": "ERC20Upgradeable",
-              "label": "_balances",
-              "type": "t_mapping(t_address,t_uint256)",
-              "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:33",
-              "offset": 0,
-              "slot": "0"
-            },
-            {
-              "contract": "ERC20Upgradeable",
-              "label": "_allowances",
-              "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
-              "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:35",
-              "offset": 0,
-              "slot": "1"
-            },
-            {
-              "contract": "ERC20Upgradeable",
-              "label": "_totalSupply",
-              "type": "t_uint256",
-              "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:37",
-              "offset": 0,
-              "slot": "2"
-            },
-            {
-              "contract": "ERC20Upgradeable",
-              "label": "_name",
-              "type": "t_string_storage",
-              "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:39",
-              "offset": 0,
-              "slot": "3"
-            },
-            {
-              "contract": "ERC20Upgradeable",
-              "label": "_symbol",
-              "type": "t_string_storage",
-              "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:40",
-              "offset": 0,
-              "slot": "4"
-            }
-          ],
-          "erc7201:openzeppelin.storage.Initializable": [
-            {
-              "contract": "Initializable",
-              "label": "_initialized",
-              "type": "t_uint64",
-              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
-              "offset": 0,
-              "slot": "0"
-            },
-            {
-              "contract": "Initializable",
-              "label": "_initializing",
-              "type": "t_bool",
-              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
-              "offset": 8,
-              "slot": "0"
-            }
-          ]
-        }
-      }
-    },
-    "251a2932cff21a8a85ec5daa7efee10b930fd321006d279ad1e6248f7b61b69e": {
-      "address": "0xF71BC288b5bcb8ca1b144114f01FDD50e5a6ddc1",
-      "txHash": "0xbfc04164e4849a54a58fcaff2590fbc233f19163f135a000b0a93cfd8a9ba5c1",
-      "layout": {
-        "solcVersion": "0.8.20",
-        "storage": [
-          {
-            "label": "zkVerifier",
-            "offset": 0,
-            "slot": "0",
-            "type": "t_contract(IZKRegenVerifier)1449",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:18"
-          },
-          {
-            "label": "usedZKProofs",
-            "offset": 0,
-            "slot": "1",
-            "type": "t_mapping(t_bytes32,t_bool)",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:22"
-          },
-          {
-            "label": "eventMultiplier",
-            "offset": 0,
-            "slot": "2",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:29"
-          },
-          {
-            "label": "pledgeFundWallet",
-            "offset": 0,
-            "slot": "3",
-            "type": "t_address",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:31"
-          },
-          {
-            "label": "pledgeRegenShare",
-            "offset": 0,
-            "slot": "4",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:32"
-          },
-          {
-            "label": "burnToSeedAmount",
-            "offset": 0,
-            "slot": "5",
-            "type": "t_uint256",
             "contract": "MAQXToken",
             "src": "contracts/MAQXToken_v1.1.sol:45"
           },
           {
-            "label": "burnToWitnessAmount",
-            "offset": 0,
-            "slot": "6",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:46"
-          },
-          {
-            "label": "burnToVerifyAmount",
-            "offset": 0,
-            "slot": "7",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:47"
-          },
-          {
-            "label": "burnToContractAmount",
-            "offset": 0,
-            "slot": "8",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:50"
-          },
-          {
-            "label": "burnToActAmount",
-            "offset": 0,
-            "slot": "9",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:54"
-          },
-          {
-            "label": "burnToCommitAmount",
+            "label": "zkVerifier",
             "offset": 0,
             "slot": "10",
-            "type": "t_uint256",
+            "type": "t_contract(IZKRegenVerifier)1449",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:55"
+            "src": "contracts/MAQXToken_v1.1.sol:48"
           },
           {
-            "label": "minWitnesses",
+            "label": "usedZKProofs",
             "offset": 0,
             "slot": "11",
-            "type": "t_uint256",
+            "type": "t_mapping(t_bytes32,t_bool)",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:56"
+            "src": "contracts/MAQXToken_v1.1.sol:51"
           },
           {
-            "label": "minVerifiers",
+            "label": "eventMultiplier",
             "offset": 0,
             "slot": "12",
             "type": "t_uint256",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:57"
+            "src": "contracts/MAQXToken_v1.1.sol:58"
           },
           {
-            "label": "globalMintWallet",
+            "label": "pledgeFundWallet",
             "offset": 0,
             "slot": "13",
-            "type": "t_address",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:59"
-          },
-          {
-            "label": "founderWallet",
-            "offset": 0,
-            "slot": "14",
             "type": "t_address",
             "contract": "MAQXToken",
             "src": "contracts/MAQXToken_v1.1.sol:60"
           },
           {
-            "label": "developerPoolWallet",
+            "label": "pledgeRegenShare",
             "offset": 0,
-            "slot": "15",
-            "type": "t_address",
+            "slot": "14",
+            "type": "t_uint256",
             "contract": "MAQXToken",
             "src": "contracts/MAQXToken_v1.1.sol:61"
           },
           {
-            "label": "daoTreasuryWallet",
+            "label": "burnToSeedAmount",
+            "offset": 0,
+            "slot": "15",
+            "type": "t_uint256",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:74"
+          },
+          {
+            "label": "burnToWitnessAmount",
             "offset": 0,
             "slot": "16",
-            "type": "t_address",
+            "type": "t_uint256",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:62"
+            "src": "contracts/MAQXToken_v1.1.sol:75"
           },
           {
-            "label": "zkDistributionWallet",
+            "label": "burnToVerifyAmount",
             "offset": 0,
             "slot": "17",
-            "type": "t_address",
+            "type": "t_uint256",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:63"
+            "src": "contracts/MAQXToken_v1.1.sol:76"
           },
           {
-            "label": "claimableZKRegen",
+            "label": "burnToContractAmount",
             "offset": 0,
             "slot": "18",
-            "type": "t_mapping(t_address,t_uint256)",
+            "type": "t_uint256",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:64"
+            "src": "contracts/MAQXToken_v1.1.sol:79"
           },
           {
-            "label": "hasReceivedSeed",
+            "label": "burnToActAmount",
             "offset": 0,
             "slot": "19",
-            "type": "t_mapping(t_address,t_bool)",
+            "type": "t_uint256",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:66"
+            "src": "contracts/MAQXToken_v1.1.sol:83"
           },
           {
-            "label": "seedBurned",
+            "label": "burnToCommitAmount",
             "offset": 0,
             "slot": "20",
-            "type": "t_mapping(t_address,t_uint256)",
+            "type": "t_uint256",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:67"
+            "src": "contracts/MAQXToken_v1.1.sol:84"
           },
           {
-            "label": "seedRegenerated",
+            "label": "minWitnesses",
             "offset": 0,
             "slot": "21",
-            "type": "t_mapping(t_address,t_uint256)",
+            "type": "t_uint256",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:68"
+            "src": "contracts/MAQXToken_v1.1.sol:85"
           },
           {
-            "label": "totalBurnedByUser",
+            "label": "minVerifiers",
             "offset": 0,
             "slot": "22",
-            "type": "t_mapping(t_address,t_uint256)",
+            "type": "t_uint256",
             "contract": "MAQXToken",
             "src": "contracts/MAQXToken_v1.1.sol:86"
           },
           {
-            "label": "pendingRegen",
+            "label": "globalMintWallet",
             "offset": 0,
             "slot": "23",
-            "type": "t_mapping(t_address,t_uint256)",
+            "type": "t_address",
             "contract": "MAQXToken",
             "src": "contracts/MAQXToken_v1.1.sol:88"
           },
           {
-            "label": "pendingEventRegen",
+            "label": "founderWallet",
             "offset": 0,
             "slot": "24",
-            "type": "t_mapping(t_address,t_uint256)",
+            "type": "t_address",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:89"
+          },
+          {
+            "label": "developerPoolWallet",
+            "offset": 0,
+            "slot": "25",
+            "type": "t_address",
             "contract": "MAQXToken",
             "src": "contracts/MAQXToken_v1.1.sol:90"
           },
           {
-            "label": "regenUsers",
-            "offset": 0,
-            "slot": "25",
-            "type": "t_mapping(t_address,t_bool)",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:94"
-          },
-          {
-            "label": "regenUserList",
+            "label": "daoTreasuryWallet",
             "offset": 0,
             "slot": "26",
-            "type": "t_array(t_address)dyn_storage",
+            "type": "t_address",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:95"
+            "src": "contracts/MAQXToken_v1.1.sol:91"
           },
           {
-            "label": "regenInterval",
+            "label": "zkDistributionWallet",
             "offset": 0,
             "slot": "27",
-            "type": "t_uint256",
+            "type": "t_address",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:92"
+          },
+          {
+            "label": "claimableZKRegen",
+            "offset": 0,
+            "slot": "28",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:93"
+          },
+          {
+            "label": "hasReceivedSeed",
+            "offset": 0,
+            "slot": "29",
+            "type": "t_mapping(t_address,t_bool)",
             "contract": "MAQXToken",
             "src": "contracts/MAQXToken_v1.1.sol:95"
           },
           {
-            "label": "lastRegenTimestamp",
-            "offset": 0,
-            "slot": "28",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:96"
-          },
-          {
-            "label": "regenThreshold",
-            "offset": 0,
-            "slot": "29",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:98"
-          },
-          {
-            "label": "lastUserRegen",
+            "label": "seedBurned",
             "offset": 0,
             "slot": "30",
             "type": "t_mapping(t_address,t_uint256)",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:99"
+            "src": "contracts/MAQXToken_v1.1.sol:96"
           },
           {
-            "label": "eventRMRBonus",
+            "label": "seedRegenerated",
             "offset": 0,
             "slot": "31",
-            "type": "t_uint256",
+            "type": "t_mapping(t_address,t_uint256)",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:103"
+            "src": "contracts/MAQXToken_v1.1.sol:97"
           },
           {
-            "label": "lockedBalance",
+            "label": "totalBurnedByUser",
             "offset": 0,
             "slot": "32",
             "type": "t_mapping(t_address,t_uint256)",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:104"
+            "src": "contracts/MAQXToken_v1.1.sol:115"
           },
           {
-            "label": "lockedUntil",
+            "label": "pendingRegen",
             "offset": 0,
             "slot": "33",
             "type": "t_mapping(t_address,t_uint256)",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:106"
+            "src": "contracts/MAQXToken_v1.1.sol:117"
           },
           {
-            "label": "isDevTokenOrigin",
+            "label": "pendingEventRegen",
             "offset": 0,
             "slot": "34",
-            "type": "t_mapping(t_address,t_bool)",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:107"
-          },
-          {
-            "label": "regenCapPercent",
-            "offset": 0,
-            "slot": "35",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:107"
-          },
-          {
-            "label": "userRegenShare",
-            "offset": 0,
-            "slot": "36",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:109"
-          },
-          {
-            "label": "daoRegenShare",
-            "offset": 0,
-            "slot": "37",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:111"
-          },
-          {
-            "label": "founderRegenShare",
-            "offset": 0,
-            "slot": "38",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:111"
-          },
-          {
-            "label": "devRegenShare",
-            "offset": 0,
-            "slot": "39",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:112"
-          },
-          {
-            "label": "regenDecayShare",
-            "offset": 0,
-            "slot": "40",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:112"
-          },
-          {
-            "label": "maxSeedRegens",
-            "offset": 0,
-            "slot": "41",
-            "type": "t_uint256",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:115"
-          },
-          {
-            "label": "pledgeFromSeedDerived",
-            "offset": 0,
-            "slot": "42",
-            "type": "t_uint256",
+            "type": "t_mapping(t_address,t_uint256)",
             "contract": "MAQXToken",
             "src": "contracts/MAQXToken_v1.1.sol:119"
           },
           {
-            "label": "giftedBalance",
+            "label": "regenUsers",
             "offset": 0,
-            "slot": "43",
-            "type": "t_mapping(t_address,t_uint256)",
+            "slot": "35",
+            "type": "t_mapping(t_address,t_bool)",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:120"
+            "src": "contracts/MAQXToken_v1.1.sol:123"
           },
           {
-            "label": "giftRewardQuota",
+            "label": "regenUserList",
             "offset": 0,
-            "slot": "44",
-            "type": "t_mapping(t_address,t_uint256)",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:121"
-          },
-          {
-            "label": "lastGiftTimestamp",
-            "offset": 0,
-            "slot": "45",
-            "type": "t_mapping(t_address,t_uint256)",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:122"
-          },
-          {
-            "label": "rmrDurations",
-            "offset": 0,
-            "slot": "46",
-            "type": "t_array(t_uint256)dyn_storage",
+            "slot": "36",
+            "type": "t_array(t_address)dyn_storage",
             "contract": "MAQXToken",
             "src": "contracts/MAQXToken_v1.1.sol:124"
           },
           {
-            "label": "rmrBonuses",
+            "label": "regenInterval",
             "offset": 0,
-            "slot": "47",
-            "type": "t_array(t_uint256)dyn_storage",
+            "slot": "37",
+            "type": "t_uint256",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:126"
+            "src": "contracts/MAQXToken_v1.1.sol:124"
           },
           {
-            "label": "rmrMinBalances",
+            "label": "lastRegenTimestamp",
             "offset": 0,
-            "slot": "48",
-            "type": "t_array(t_uint256)dyn_storage",
+            "slot": "38",
+            "type": "t_uint256",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:126"
+            "src": "contracts/MAQXToken_v1.1.sol:125"
           },
           {
-            "label": "rmrStartTime",
+            "label": "regenThreshold",
             "offset": 0,
-            "slot": "49",
-            "type": "t_mapping(t_address,t_uint256)",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:126"
-          },
-          {
-            "label": "lastClaimedTier",
-            "offset": 0,
-            "slot": "50",
-            "type": "t_mapping(t_address,t_uint8)",
-            "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:126"
-          },
-          {
-            "label": "tierRewards",
-            "offset": 0,
-            "slot": "51",
-            "type": "t_mapping(t_uint256,t_uint256)",
+            "slot": "39",
+            "type": "t_uint256",
             "contract": "MAQXToken",
             "src": "contracts/MAQXToken_v1.1.sol:127"
           },
           {
-            "label": "rmrTiers",
+            "label": "lastUserRegen",
+            "offset": 0,
+            "slot": "40",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:128"
+          },
+          {
+            "label": "eventRMRBonus",
+            "offset": 0,
+            "slot": "41",
+            "type": "t_uint256",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:132"
+          },
+          {
+            "label": "lockedBalance",
+            "offset": 0,
+            "slot": "42",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:133"
+          },
+          {
+            "label": "lockedUntil",
+            "offset": 0,
+            "slot": "43",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:135"
+          },
+          {
+            "label": "isDevTokenOrigin",
+            "offset": 0,
+            "slot": "44",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:136"
+          },
+          {
+            "label": "regenCapPercent",
+            "offset": 0,
+            "slot": "45",
+            "type": "t_uint256",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:136"
+          },
+          {
+            "label": "userRegenShare",
+            "offset": 0,
+            "slot": "46",
+            "type": "t_uint256",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:138"
+          },
+          {
+            "label": "daoRegenShare",
+            "offset": 0,
+            "slot": "47",
+            "type": "t_uint256",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:140"
+          },
+          {
+            "label": "founderRegenShare",
+            "offset": 0,
+            "slot": "48",
+            "type": "t_uint256",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:140"
+          },
+          {
+            "label": "devRegenShare",
+            "offset": 0,
+            "slot": "49",
+            "type": "t_uint256",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:141"
+          },
+          {
+            "label": "regenDecayShare",
+            "offset": 0,
+            "slot": "50",
+            "type": "t_uint256",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:141"
+          },
+          {
+            "label": "maxSeedRegens",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_uint256",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:144"
+          },
+          {
+            "label": "pledgeFromSeedDerived",
             "offset": 0,
             "slot": "52",
-            "type": "t_array(t_struct(RMRConfig)1504_storage)6_storage",
+            "type": "t_uint256",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:148"
+            "src": "contracts/MAQXToken_v1.1.sol:147"
+          },
+          {
+            "label": "giftedBalance",
+            "offset": 0,
+            "slot": "53",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:149"
+          },
+          {
+            "label": "giftRewardQuota",
+            "offset": 0,
+            "slot": "54",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:150"
+          },
+          {
+            "label": "lastGiftTimestamp",
+            "offset": 0,
+            "slot": "55",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:152"
+          },
+          {
+            "label": "rmrDurations",
+            "offset": 0,
+            "slot": "56",
+            "type": "t_array(t_uint256)dyn_storage",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:157"
+          },
+          {
+            "label": "rmrBonuses",
+            "offset": 0,
+            "slot": "57",
+            "type": "t_array(t_uint256)dyn_storage",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:157"
+          },
+          {
+            "label": "rmrMinBalances",
+            "offset": 0,
+            "slot": "58",
+            "type": "t_array(t_uint256)dyn_storage",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:158"
+          },
+          {
+            "label": "rmrStartTime",
+            "offset": 0,
+            "slot": "59",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:159"
+          },
+          {
+            "label": "lastClaimedTier",
+            "offset": 0,
+            "slot": "60",
+            "type": "t_mapping(t_address,t_uint8)",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:159"
+          },
+          {
+            "label": "tierRewards",
+            "offset": 0,
+            "slot": "61",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:160"
+          },
+          {
+            "label": "rmrTiers",
+            "offset": 0,
+            "slot": "62",
+            "type": "t_array(t_struct(RMRConfig)1561_storage)6_storage",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:182"
           },
           {
             "label": "rmrTier",
             "offset": 0,
-            "slot": "64",
+            "slot": "74",
             "type": "t_mapping(t_address,t_uint256)",
             "contract": "MAQXToken",
-            "src": "contracts/MAQXToken_v1.1.sol:148"
+            "src": "contracts/MAQXToken_v1.1.sol:184"
+          },
+          {
+            "label": "sellCooldown",
+            "offset": 0,
+            "slot": "75",
+            "type": "t_uint256",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:931"
+          },
+          {
+            "label": "lastBuyTimestamp",
+            "offset": 0,
+            "slot": "76",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:936"
+          },
+          {
+            "label": "uniswapV2Pair",
+            "offset": 0,
+            "slot": "77",
+            "type": "t_address",
+            "contract": "MAQXToken",
+            "src": "contracts/MAQXToken_v1.1.sol:940"
           }
         ],
         "types": {
@@ -1083,7 +644,7 @@
             "label": "address[]",
             "numberOfBytes": "32"
           },
-          "t_array(t_struct(RMRConfig)1504_storage)6_storage": {
+          "t_array(t_struct(RMRConfig)1561_storage)6_storage": {
             "label": "struct MAQXToken.RMRConfig[6]",
             "numberOfBytes": "384"
           },
@@ -1115,7 +676,7 @@
             "label": "mapping(uint256 => uint256)",
             "numberOfBytes": "32"
           },
-          "t_struct(RMRConfig)1504_storage": {
+          "t_struct(RMRConfig)1561_storage": {
             "label": "struct MAQXToken.RMRConfig",
             "members": [
               {

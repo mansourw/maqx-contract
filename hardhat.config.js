@@ -1,3 +1,4 @@
+require("hardhat-deploy");
 require("@nomicfoundation/hardhat-toolbox");
 require("@matterlabs/hardhat-zksync-deploy");
 require("@matterlabs/hardhat-zksync-solc");
@@ -14,14 +15,28 @@ const {
 
 module.exports = {
   solidity: {
-    version: "0.8.20",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
+    compilers: [
+      {
+        version: "0.8.22",
+        settings: {
+          viaIR: false,
+          optimizer: {
+            enabled: true,
+            runs: 20,
+          },
+        },
       },
-      viaIR: true,
-    },
+      {
+        version: "0.8.20",
+        settings: {
+          viaIR: false,
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
+      },
+    ],
   },
   defaultNetwork: "zkSyncTestnet",
   networks: {
@@ -45,12 +60,18 @@ module.exports = {
     },
   },
   zksolc: {
-    version: "1.4.0",
+    version: "1.5.1",
     compilerSource: "binary",
     settings: {
       optimizer: {
         enabled: true,
       },
+      viaIR: false, // was true
+    },
+  },
+  namedAccounts: {
+    deployer: {
+      default: 0,
     },
   },
 };

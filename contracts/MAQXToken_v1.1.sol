@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20Burnable
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 // For debugging output
 import "hardhat/console.sol";
@@ -13,10 +14,55 @@ interface IZKRegenVerifier {
     function verifyProof(bytes calldata proof, address[] calldata users, uint256[] calldata amounts) external view returns (bool);
 }
 
-contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable, OwnableUpgradeable {
+/**
+ * @title MAQXToken
+ * @dev Upgradeable ERC20 token with advanced regen and community logic.
+ * Inherits OpenZeppelin Initializable, OwnableUpgradeable, UUPSUpgradeable for upgradeability and ownership.
+ */
+contract MAQXToken is 
+    Initializable,
+    ERC20Upgradeable,
+    ERC20BurnableUpgradeable,
+    OwnableUpgradeable,
+    UUPSUpgradeable
+{
+    /**
+     * @notice DEX LP pair address for trading and liquidity management.
+     */
+    address public pair;
+
+    event RegenMinted(
+        address indexed user,
+        uint256 userAmt,
+        uint256 daoAmt,
+        uint256 devAmt,
+        uint256 founderAmt,
+        uint256 pledgeAmt,
+        uint256 globalAmt
+    );
+    // Version: 1.1
+
+    address public founder;
+    modifier onlyFounder() {
+        require(msg.sender == founder, "Only founder can call this function");
+        _;
+    }
+
+    // RMR Regen batching/interval logic
+    uint256 public rmrInterval; // Regen interval (set extern)
+    mapping(address => uint256) public lastRegen; // Last regen time per user
+    address[] public eligibleUsers; // List of users eligible for regen
+
+    // Global transfer cooldown logic
+    mapping(address => uint256) private _lastTransferTimestamp;
+    uint256 public transferDelay;
+    mapping(address => bool) private _isExcludedFromLimits;
+    uint256 public globalCooldownTime;
+    uint256 public maxSellPercent;
+    mapping(address => bool) public isExcludedFromLimit;
+
     /// @notice The zkVerifier contract address (public getter).
     IZKRegenVerifier public zkVerifier;
-    // Version: 1.1
 
     // Tracks submitted ZK proof hashes to prevent re-use
     mapping(bytes32 => bool) public usedZKProofs;
@@ -115,6 +161,8 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     mapping(address => uint256) public giftRewardQuota;
     mapping(address => uint256) public lastGiftTimestamp;
 
+    // ─────────────────────────────────────────────────────────────
+
     // Added variables for RMR logic
     uint256[] public rmrDurations;
     uint256[] public rmrBonuses;
@@ -140,6 +188,11 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     // RMR logic
     RMRConfig[6] public rmrTiers;
     mapping(address => uint256) public rmrTier;
+
+    modifier rmrEligible(address user) {
+        require(block.timestamp >= lastRegen[user] + rmrInterval, "RMR: interval not met");
+        _;
+    }
 
     function _updateRMRTier(address user) internal {
         if (rmrStartTime[user] == 0) {
@@ -206,6 +259,9 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         emit TierRewardAmountChanged(tier, amount);
     }
 
+    /**
+     * @dev Initializes the upgradeable contract, including ownership and UUPS modules.
+     */
     function initialize(
         address _globalMintWallet,
         address _founderWallet,
@@ -215,7 +271,9 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         __ERC20_init("MAQX", "MAQX");
         __ERC20Burnable_init();
         __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
 
+        founder = msg.sender;
         globalMintWallet = _globalMintWallet;
         founderWallet = _founderWallet;
         developerPoolWallet = _developerPoolWallet;
@@ -267,7 +325,37 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         pledgeFundWallet = 0x95Bc0be1892c9B040880A90D4Ef94BD33BCFAEe2;
         pledgeRegenShare = 10;
         zkDistributionWallet = 0x5543332C405A3Cbbf7EeeAe91b410FD06213135b;
+
+        // Initialize sellCooldown to 72 hours (was previously 48 hours)
+        sellCooldown = 72 hours;
+
+        // Exclude deployer and Global Mint Wallet from LP sell limit
+        isExcludedFromLimit[msg.sender] = true;
+        isExcludedFromLimit[0xa321c7F2F64e4Ca75C72Ce4Cd79De2bd19eec0CD] = true;
+
+        // Exclude founder and global mint wallet from global transfer cooldown
+        _isExcludedFromLimits[owner()] = true;
+        _isExcludedFromLimits[globalMintWallet] = true;
+
+        // Assign values for variables
+        transferDelay = 5 minutes;
+        globalCooldownTime = 300;
+        maxSellPercent = 10;
     }
+
+    /**
+     * @notice Set the LP pair address for DEX liquidity.
+     * Only the contract owner can set this.
+     * @param _pair The LP pair address.
+     */
+    function setPair(address _pair) external onlyOwner {
+        pair = _pair;
+    }
+
+    /**
+     * @dev Authorize contract upgrades. Only the owner can upgrade.
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function grantSeed(address user) external onlyOwner {
         require(!hasReceivedSeed[user], "Seed already granted");
@@ -280,6 +368,14 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
 
     function grantEarlyAdoptionToken(address to, uint256 amount) external onlyOwner {
         _transfer(developerPoolWallet, to, amount);
+    }
+
+    function setMaxSellPercent(uint256 _percent) external onlyOwner {
+        maxSellPercent = _percent;
+    }
+
+    function setExcludedFromLimit(address account, bool excluded) external onlyOwner {
+        isExcludedFromLimit[account] = excluded;
     }
 
     function grantLockedDevToken(address to, uint256 amount) external onlyOwner {
@@ -509,6 +605,27 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
     }
 
     function _update(address from, address to, uint256 value) internal override {
+        // ─────────────────────────────────────────────────────────────
+        // Global transfer cooldown: enforce delay between transfers unless excluded
+        if (from != address(0) && !_isExcludedFromLimits[from]) {
+            require(block.timestamp - _lastTransferTimestamp[from] >= globalCooldownTime, "Global cooldown: wait before next transfer");
+            _lastTransferTimestamp[from] = block.timestamp;
+        }
+        // ─────────────────────────────────────────────────────────────
+        // SELL COOLDOWN and LP SELL LIMIT: Exclude owner from these rules
+        if (from != owner()) {
+            if (uniswapV2Pair != address(0)) {
+                if (to == uniswapV2Pair && from != address(0)) {
+                    require(block.timestamp > lastBuyTimestamp[from] + sellCooldown, "Sell cooldown active");
+                    uint256 pairBalance = balanceOf(uniswapV2Pair);
+                    uint256 maxSellAmount = (pairBalance * 10) / 100;
+                    require(value <= maxSellAmount, "Exceeds max sell amount");
+                }
+            } else {
+                require(uniswapV2Pair != address(0), "Pair not set");
+            }
+        }
+
         if (from != address(0)) {
             uint256 unlocked = balanceOf(from) - lockedBalance[from];
             // DEBUG: transfer lock check
@@ -520,6 +637,12 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         }
 
         super._update(from, to, value);
+
+        // ─────────────────────────────────────────────────────────────
+        // If buying from LP, set lastBuyTimestamp
+        if (from == uniswapV2Pair && to != address(0)) {
+            lastBuyTimestamp[to] = block.timestamp;
+        }
 
         uint256 len = rmrDurations.length;
         if (len == 0 || rmrBonuses.length != len || rmrMinBalances.length != len) {
@@ -620,12 +743,9 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
      * @param totalAmount The amount to mint for global allocation.
      * Founder and Dev each get 1% extra on top.
      */
-    function mintForPopulationIncrease(uint256 totalAmount) external onlyOwner {
-        require(totalAmount > 0, "Invalid mint amount");
-
+    function mintForPopulationIncrease(uint256 totalAmount) external onlyFounder {
         uint256 founderBonus = (totalAmount * 1) / 100;
         uint256 devBonus = (totalAmount * 1) / 100;
-        uint256 totalToMint = totalAmount + founderBonus + devBonus;
 
         _mint(globalMintWallet, totalAmount);
         _mint(founderWallet, founderBonus);
@@ -639,12 +759,9 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
      * @param totalAmount The amount to mint for global allocation.
      * Founder and Dev each get 1% extra on top.
      */
-    function mintFounderEmergency(uint256 totalAmount) external onlyOwner {
-        require(totalAmount > 0, "Invalid mint amount");
-
+    function mintFounderEmergency(uint256 totalAmount) external onlyFounder {
         uint256 founderBonus = (totalAmount * 1) / 100;
         uint256 devBonus = (totalAmount * 1) / 100;
-        uint256 totalToMint = totalAmount + founderBonus + devBonus;
 
         _mint(globalMintWallet, totalAmount);
         _mint(founderWallet, founderBonus);
@@ -713,17 +830,16 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         bytes32 proofHash = keccak256(abi.encodePacked(proof, users, amounts));
         require(!usedZKProofs[proofHash], "ZK proof already used");
         usedZKProofs[proofHash] = true;
-        // zkVerifier address is checked above via "require(zkVerifier != IZKRegenVerifier(address(0)), "Verifier not set");"
 
         bool isValid = zkVerifier.verifyProof(proof, users, amounts);
         require(isValid, "Invalid zk proof");
 
-        uint256 totalUserAmt = 0;
-        uint256 totalDaoAmt = 0;
-        uint256 totalFounderAmt = 0;
-        uint256 totalDevAmt = 0;
-        uint256 totalPledgeAmt = 0;
-        uint256 totalGlobalAmt = 0;
+        uint256 totalUserRegen = 0;
+        uint256 totalFounderRegen = 0;
+        uint256 totalDAORegen = 0;
+        uint256 totalDevRegen = 0;
+        uint256 totalPledgeRegen = 0;
+        uint256 totalGlobalMintRegen = 0;
 
         for (uint256 i = 0; i < users.length; i++) {
             address user = users[i];
@@ -740,21 +856,45 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
             } else {
                 // Normal user: apply decay, calculate split, accumulate for batch minting
                 uint256 decayedAmt = (amountBurned * regenDecayShare) / 100;
-                uint256 regenAmount = amountBurned - decayedAmt;
-                uint256 userAmt = _calculateUserReward(user, amountBurned, 0); // Only normal burns here
-                claimableZKRegen[user] += userAmt;
-                totalUserAmt += userAmt;
-                uint256 daoAmt = (regenAmount * 4) / 100;
-                uint256 founderAmt = (regenAmount * 4) / 100;
-                uint256 devAmt = (regenAmount * 2) / 100;
-                uint256 pledgeAmt = (regenAmount * pledgeRegenShare) / 100;
-                uint256 globalAmt = regenAmount - userAmt - daoAmt - founderAmt - devAmt - pledgeAmt;
-                totalDaoAmt += daoAmt;
-                totalFounderAmt += founderAmt;
-                totalDevAmt += devAmt;
-                totalPledgeAmt += pledgeAmt;
-                totalGlobalAmt += globalAmt;
-                emit RegenExecuted(user, regenAmount, userAmt, daoAmt, founderAmt, devAmt, pledgeAmt);
+                uint256 totalRegenAmount = amountBurned - decayedAmt;
+
+                // 50% to user, with RMR multiplier applied
+                uint256 userRegenAmount = (totalRegenAmount * 50) / 100;
+                // RMR multiplier: between 5% to 25% (placeholder: not applied yet)
+                // uint256 rmrMultiplier = getRMRMultiplier(user); // returns percent (e.g., 5, 10, 15, 20, 25)
+                // userRegenAmount = userRegenAmount + (userRegenAmount * rmrMultiplier) / 100;
+                // TODO: Apply RMR multiplier to userRegenAmount above if not already handled
+
+                // Accumulate for batch mint to zkDistributionWallet
+                claimableZKRegen[user] += userRegenAmount;
+                totalUserRegen += userRegenAmount;
+
+                // 4% to founder
+                uint256 founderRegenAmount = (totalRegenAmount * 4) / 100;
+                totalFounderRegen += founderRegenAmount;
+                // 4% to DAO Treasury
+                uint256 daoRegenAmount = (totalRegenAmount * 4) / 100;
+                totalDAORegen += daoRegenAmount;
+                // 2% to Dev Pool
+                uint256 devRegenAmount = (totalRegenAmount * 2) / 100;
+                totalDevRegen += devRegenAmount;
+                // 10% to Global Pledge Fund
+                uint256 pledgeRegenAmount = (totalRegenAmount * 10) / 100;
+                totalPledgeRegen += pledgeRegenAmount;
+                // Remaining to Global Mint Wallet
+                uint256 allocated = userRegenAmount + founderRegenAmount + daoRegenAmount + devRegenAmount + pledgeRegenAmount;
+                uint256 globalMintRegenAmount = totalRegenAmount > allocated ? totalRegenAmount - allocated : 0;
+                totalGlobalMintRegen += globalMintRegenAmount;
+
+                emit RegenExecuted(
+                    user,
+                    totalRegenAmount,
+                    userRegenAmount,
+                    daoRegenAmount,
+                    founderRegenAmount,
+                    devRegenAmount,
+                    pledgeRegenAmount
+                );
             }
 
             pendingRegen[user] = 0;
@@ -762,14 +902,13 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
             regenUsers[user] = false;
             lastUserRegen[user] = block.timestamp;
         }
-
-        // Batch mint: user regen share goes to zkDistributionWallet (not directly to user)
-        if (totalUserAmt > 0) _mint(zkDistributionWallet, totalUserAmt);
-        if (totalDaoAmt > 0) _mint(daoTreasuryWallet, totalDaoAmt);
-        if (totalFounderAmt > 0) _mint(founderWallet, totalFounderAmt);
-        if (totalDevAmt > 0) _mint(developerPoolWallet, totalDevAmt);
-        if (totalPledgeAmt > 0) _mint(pledgeFundWallet, totalPledgeAmt);
-        if (totalGlobalAmt > 0) _mint(globalMintWallet, totalGlobalAmt);
+        // Mint accumulated shares
+        if (totalUserRegen > 0) _mint(zkDistributionWallet, totalUserRegen);
+        if (totalFounderRegen > 0) _mint(founderWallet, totalFounderRegen);
+        if (totalDAORegen > 0) _mint(daoTreasuryWallet, totalDAORegen);
+        if (totalDevRegen > 0) _mint(developerPoolWallet, totalDevRegen);
+        if (totalPledgeRegen > 0) _mint(pledgeFundWallet, totalPledgeRegen);
+        if (totalGlobalMintRegen > 0) _mint(globalMintWallet, totalGlobalMintRegen);
 
         lastRegenTimestamp = block.timestamp;
     }
@@ -780,4 +919,95 @@ contract MAQXToken is Initializable, ERC20Upgradeable, ERC20BurnableUpgradeable,
         claimableZKRegen[msg.sender] = 0;
         _transfer(zkDistributionWallet, msg.sender, amount);
     }
+    /**
+     * @notice Set the UniswapV2Pair address for LP trading. Only owner can set.
+     */
+    function setUniswapV2Pair(address _pair) external onlyOwner {
+        uniswapV2Pair = _pair;
+    }
+
+    /**
+     * @notice Set the sell cooldown period (in seconds). Only owner can set.
+     */
+    function setSellCooldown(uint256 _cooldown) external onlyOwner {
+        sellCooldown = _cooldown;
+    }
+
+    /// @notice Sets the global cooldown duration between transfers
+    /// @param _cooldown New cooldown time in seconds
+    function setGlobalCooldownTime(uint256 _cooldown) external onlyOwner {
+        globalCooldownTime = _cooldown;
+    }
+    /// @notice Cooldown period (in seconds) after buying from LP before selling is allowed.
+    uint256 public sellCooldown;
+    /// @notice Mapping to track the last buy timestamp for each address (from LP).
+    mapping(address => uint256) public lastBuyTimestamp;
+    /// @notice UniswapV2Pair address for MAQX/ETH (or relevant pair).
+    address public uniswapV2Pair;
+    // ─────────────────────────────────────────────────────────────
+    // Regen cap calculation helper
+    /*
+    function _calculateRegenCap(address user) internal view returns (uint256) {
+        // Placeholder logic for regen cap
+        return 1000 ether; // Example cap
+    }
+    */
+
+    // Regen share calculation helper for batch regen (internal modularization)
+    function _calculateRegenShares(address user)
+        internal
+        view
+        returns (
+            uint256 daoAmt,
+            uint256 devAmt,
+            uint256 founderAmt,
+            uint256 pledgeAmt,
+            uint256 globalAmt
+        )
+    {
+        uint256 regenAmt = pendingRegen[user];
+        // uint256 regenCap = _calculateRegenCap(user);
+        //
+        // if (regenAmt > regenCap) {
+        //     regenAmt = regenCap;
+        // }
+
+        daoAmt     = (regenAmt * daoRegenShare) / 100;
+        devAmt     = (regenAmt * devRegenShare) / 100;
+        founderAmt = (regenAmt * founderRegenShare) / 100;
+        pledgeAmt  = (regenAmt * pledgeRegenShare) / 100;
+        globalAmt  = regenAmt - (daoAmt + devAmt + founderAmt + pledgeAmt);
+    }
+
+    function regenAllEligible() external onlyOwner onlyAfterRegenInterval {
+        for (uint256 i = 0; i < eligibleUsers.length; i++) {
+            address user = eligibleUsers[i];
+            (
+                uint256 daoAmt,
+                uint256 devAmt,
+                uint256 founderAmt,
+                uint256 pledgeAmt,
+                uint256 globalAmt
+            ) = _calculateRegenShares(user);
+            uint256 regenAmt = pendingRegen[user];
+            // uint256 regenCap = _calculateRegenCap(user);
+            // if (regenAmt > regenCap) {
+            //     regenAmt = regenCap;
+            // }
+            uint256 userAmt = regenAmt - (daoAmt + devAmt + founderAmt + pledgeAmt + globalAmt);
+            if (userAmt > 0) _mint(user, userAmt);
+            if (daoAmt > 0) _mint(daoTreasuryWallet, daoAmt);
+            if (devAmt > 0) _mint(developerPoolWallet, devAmt);
+            if (founderAmt > 0) _mint(founderWallet, founderAmt);
+            if (pledgeAmt > 0) _mint(pledgeFundWallet, pledgeAmt);
+            if (globalAmt > 0) _mint(globalMintWallet, globalAmt);
+
+            emit RegenMinted(user, userAmt, daoAmt, devAmt, founderAmt, pledgeAmt, globalAmt);
+
+            pendingRegen[user] = 0;
+        }
+
+        lastRegenTimestamp = block.timestamp;
+    }
+
 }
