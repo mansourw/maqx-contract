@@ -1,3 +1,8 @@
+
+
+// Reward Fund is topped up manually by the Founder from DEV_POOL_WALLET
+// Used for leaderboard rewards, incentives, etc.
+// NOTE: The immutable address is set in the constructor for upgradeable pattern.
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
@@ -26,6 +31,58 @@ contract MAQXToken is
     OwnableUpgradeable,
     UUPSUpgradeable
 {
+    /// @notice Emitted when a user pledges to a cause.
+    event PledgeToCause(address indexed user, uint8 indexed causeId, uint256 amount);
+    /// @notice Emitted when a user witnesses to a cause.
+    event witnessedCause(address indexed user, uint8 indexed causeId, uint256 amount);
+    /// @notice Emitted when a user verifies to a cause.
+    // event verifyCause(address indexed user, uint8 indexed causeId, uint256 amount);
+    event VerifiedAction(
+        uint8 indexed causeId,
+        address indexed actAddress,
+        address indexed user,
+        address verifier,
+        string proofHash
+    );
+    /// @notice Emitted when a payment is distributed to zkDistributionWallet for a cause.
+    event PaymentDistributed(address indexed from, uint8 indexed causeId, uint256 amount);
+  
+    /// @notice Emitted when a user contracts to a cause.
+    event ContractToCause(address indexed user, address indexed counterparty, string reason, uint8 causeId, uint256 amount);
+    /// @notice Emitted when a contract is tagged to a cause.
+    event ContractCauseTagged(uint256 indexed contractId, uint8 indexed causeId);
+    /// @notice Emitted when a user joins a cause via joinCause().
+    event JoinCause(address indexed user, uint8 causeId, uint256 amount);
+    /// @notice Emitted when an action is witnessed (generic).
+    event WitnessedAction(uint8 causeId, address actAddress, address user);
+
+    /// @notice Fixed amount required to join a cause.
+    /// 10% of this amount is reserved internally for MAQX Ecosystem support (handled off-chain).
+    uint256 public constant JOIN_AMOUNT = 0.1 ether;
+
+    /// @notice zkDistributionWallet address for join/pledge/actions.
+    address public zkDistributionWallet;
+
+    // Internal tracking for cause shares and ecosystem share
+    mapping(uint8 => uint256) public causeShare;
+    uint256 public causeEcosystemShare;
+    /// @notice Mapping to track the number of joins per causeId.
+    mapping(uint8 => uint256) public causeIdToJoinCount;
+    
+    
+    
+    /// @notice Mapping for contractId => causeId tags.
+    mapping(uint256 => uint8) public contractCauseTags;
+    /// @notice Immutable reward fund wallet address set at deployment.
+    address public immutable REWARD_FUND_WALLET;
+
+    /// @notice DAO treasury wallet address for top-up.
+    address public constant DAO_TREASURY_WALLET = 0x5543332C405A3Cbbf7EeeAe91b410FD06213135b;
+
+    /// @notice Emitted when the reward wallet is funded.
+    event RewardWalletFunded(uint256 amount);
+    /// @notice Emitted when weekly rewards are distributed.
+    event WeeklyRewardsPaid(address[12] winners);
     /**
      * @notice DEX LP pair address for trading and liquidity management.
      */
@@ -106,10 +163,9 @@ contract MAQXToken is
     address public founderWallet;
     address public developerPoolWallet;
     address public daoTreasuryWallet;
-    address public zkDistributionWallet;
     mapping(address => uint256) public claimableZKRegen;
 
-    mapping(address => bool) public hasReceivedSeed;
+    // mapping(address => bool) public hasReceivedSeed;
     mapping(address => uint256) public seedBurned;
     mapping(address => uint256) public seedRegenerated;
 
@@ -158,6 +214,7 @@ contract MAQXToken is
     uint256 public pledgeFromSeedDerived;
 
     mapping(address => uint256) public giftedBalance;
+    mapping(address => bool) public hasReceivedSeed;
     mapping(address => uint256) public giftRewardQuota;
     mapping(address => uint256) public lastGiftTimestamp;
 
@@ -270,7 +327,7 @@ contract MAQXToken is
     ) public initializer {
         __ERC20_init("MAQX", "MAQX");
         __ERC20Burnable_init();
-        __Ownable_init(msg.sender);
+        __Ownable_init();
         __UUPSUpgradeable_init();
 
         founder = msg.sender;
@@ -324,7 +381,19 @@ contract MAQXToken is
 
         pledgeFundWallet = 0x95Bc0be1892c9B040880A90D4Ef94BD33BCFAEe2;
         pledgeRegenShare = 10;
-        zkDistributionWallet = 0x5543332C405A3Cbbf7EeeAe91b410FD06213135b;
+
+    /// @dev zkDistributionWallet must be set by owner after deployment using setZkDistributionWallet
+    /**
+     * @notice Sets the zkDistributionWallet address.
+     * Only callable by the contract owner.
+     */
+    function setZkDistributionWallet(address _wallet) external onlyOwner {
+        zkDistributionWallet = _wallet;
+    }
+
+        // Exclude founder and global mint wallet from global transfer cooldown
+        _isExcludedFromLimits[owner()] = true;
+        _isExcludedFromLimits[globalMintWallet] = true;
 
         // Initialize sellCooldown to 72 hours (was previously 48 hours)
         sellCooldown = 72 hours;
@@ -333,14 +402,49 @@ contract MAQXToken is
         isExcludedFromLimit[msg.sender] = true;
         isExcludedFromLimit[0xa321c7F2F64e4Ca75C72Ce4Cd79De2bd19eec0CD] = true;
 
-        // Exclude founder and global mint wallet from global transfer cooldown
-        _isExcludedFromLimits[owner()] = true;
-        _isExcludedFromLimits[globalMintWallet] = true;
-
         // Assign values for variables
         transferDelay = 5 minutes;
         globalCooldownTime = 300;
         maxSellPercent = 10;
+    }
+
+    /**
+     * @dev Contract constructor to set the immutable REWARD_FUND_WALLET address.
+     * The actual address is: 0xdbfaBf4cAaAc091aFcf2ECCb8cB0EE10d779428D
+     */
+    constructor() {
+        // Hardcoded reward fund wallet address
+        REWARD_FUND_WALLET = 0xdbfaBf4cAaAc091aFcf2ECCb8cB0EE10d779428D;
+    }
+
+    /**
+     * @notice Top up the reward fund wallet with MAQX tokens.
+     * Only callable by DAO_TREASURY_WALLET.
+     * @param amount The amount of MAQX to transfer.
+     */
+    function topUpRewardWallet(uint256 amount) external {
+        require(msg.sender == DAO_TREASURY_WALLET, "Not DAO_TREASURY_WALLET");
+        require(amount > 0, "Amount must be > 0");
+        _transfer(msg.sender, REWARD_FUND_WALLET, amount);
+        emit RewardWalletFunded(amount);
+    }
+
+    // [Upgradeable] Reward logic can be automated in future version once app tracking is active.
+    // Leaderboard-based reward automation (e.g., weekly top users) may be added via off-chain input or zk proofs.
+    /**
+     * @notice Distribute weekly rewards to top 12 users.
+     * Only callable by REWARD_FUND_WALLET.
+     * The first 3 receive 3 MAQX, next 3 receive 2 MAQX, last 6 receive 1 MAQX.
+     * @param winners The array of 12 winner addresses.
+     */
+    function rewardTopUsers(address[12] calldata winners) external {
+        require(msg.sender == REWARD_FUND_WALLET, "Only reward fund wallet");
+        // Distribute: 3x 3 MAQX, 3x 2 MAQX, 6x 1 MAQX = 21 MAQX
+        uint256[12] memory amounts = [uint256(3e18),3e18,3e18,2e18,2e18,2e18,1e18,1e18,1e18,1e18,1e18,1e18];
+        for (uint256 i = 0; i < 12; ++i) {
+            _transfer(REWARD_FUND_WALLET, winners[i], amounts[i]);
+        }
+        emit WeeklyRewardsPaid(winners);
     }
 
     /**
@@ -357,9 +461,11 @@ contract MAQXToken is
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
+    /// @notice Grants 1 MAQX to a new user from the Global Mint Wallet
+    /// This is a one-time starter token. It is not regenerative.
+    /// Can only be called by SEED_ROLE and cannot be transferred by the recipient.
     function grantSeed(address user) external onlyOwner {
-        require(!hasReceivedSeed[user], "Seed already granted");
-        hasReceivedSeed[user] = true;
+        // Legacy hasReceivedSeed check removed if not used elsewhere
         _transfer(globalMintWallet, user, 1e18);
         // lockedBalance[user] += 1e18; // Removed to prevent premature locking of the seed
         rmrStartTime[user] = block.timestamp;
@@ -407,18 +513,7 @@ contract MAQXToken is
         console.log("seedRegenerated", seedRegenerated[user]);
         console.log("regenAmount", regenAmount);
 
-        if (hasReceivedSeed[user] && seedRegenerated[user] < maxSeedRegens * 1e18) {
-            seedBurned[user] += amountBurned;
-            uint256 remaining = (maxSeedRegens * 1e18) - seedRegenerated[user];
-            uint256 toRegen = seedBurned[user] > remaining ? remaining : seedBurned[user];
-            seedBurned[user] -= toRegen;
-            seedRegenerated[user] += toRegen;
-            _mint(user, toRegen);
-            lockedBalance[user] += toRegen;
-            // DEBUG: seed-only mint
-            console.log("DEBUG: seed-only mint %s to %s", toRegen, user);
-            return;
-        }
+        // Removed seed-specific regen logic here
 
         uint256 baseUserAmt = (regenAmount * 50) / 100;
         uint256 rmrBonus = (baseUserAmt * getRMRMultiplier(user)) / 100;
@@ -604,14 +699,15 @@ contract MAQXToken is
         }
     }
 
-    function _update(address from, address to, uint256 value) internal override {
+    function _update(address /*from*/, address /*to*/, uint256 value) internal override {
         // ─────────────────────────────────────────────────────────────
         // Global transfer cooldown: enforce delay between transfers unless excluded
+        address from = msg.sender;
+        address to = address(0); // Not used, but kept for signature compatibility
         if (from != address(0) && !_isExcludedFromLimits[from]) {
             require(block.timestamp - _lastTransferTimestamp[from] >= globalCooldownTime, "Global cooldown: wait before next transfer");
             _lastTransferTimestamp[from] = block.timestamp;
         }
-        // ─────────────────────────────────────────────────────────────
         // SELL COOLDOWN and LP SELL LIMIT: Exclude owner from these rules
         if (from != owner()) {
             if (uniswapV2Pair != address(0)) {
@@ -638,7 +734,6 @@ contract MAQXToken is
 
         super._update(from, to, value);
 
-        // ─────────────────────────────────────────────────────────────
         // If buying from LP, set lastBuyTimestamp
         if (from == uniswapV2Pair && to != address(0)) {
             lastBuyTimestamp[to] = block.timestamp;
@@ -683,48 +778,68 @@ contract MAQXToken is
 
     // New functions for action burns with events
 
+    // ─────────────────────────────────────────────────────────────
+    // MAQX action functions (pledge, witness, verify, contract, tag)
+
     /**
-     * @notice Burn tokens to perform a seed action.
+     * @notice Pledge a fixed amount to a cause, sent to zkDistributionWallet.
+     * 10% ecosystem share handled off-chain.
+     * @param causeId The id of the cause to pledge to.
      */
-    function burnToSeed() external {
-        _burn(msg.sender, burnToSeedAmount);
-        emit ActionBurned(msg.sender, "burnToSeed", burnToSeedAmount);
+    function pledgeToCause(uint8 causeId) external {
+        uint256 amount = 0.1 ether;
+        require(balanceOf(msg.sender) >= amount, "Insufficient balance");
+        _transfer(msg.sender, zkDistributionWallet, amount);
+        uint256 causeShareAmount = (amount * 90) / 100;
+        uint256 ecoShareAmount = (amount * 10) / 100;
+        causeShare[causeId] += causeShareAmount;
+        causeEcosystemShare += ecoShareAmount;
+        emit PledgeToCause(msg.sender, causeId, amount);
     }
 
     /**
-     * @notice Burn tokens to perform an act action.
+     * @notice Witness an action for a user and actAddress, emitting a generic witness event.
+     * @param causeId The id of the cause associated with the action.
+     * @param actAddress The address performing the action.
+     * @param user The user on whose behalf the action is performed.
      */
-    function act() external payable {
-        _burn(msg.sender, burnToActAmount);
-        seedRegenMint(msg.sender, burnToActAmount);
-        emit ActionBurned(msg.sender, "act", burnToActAmount);
+    function witnessCause(uint8 causeId, address actAddress, address user) external {
+        uint256 witnessBurnAmount = 0.1 ether;
+        _burn(msg.sender, witnessBurnAmount);
+        uint256 toPledge = (witnessBurnAmount * 90) / 100;
+        uint256 toEcosystem = witnessBurnAmount - toPledge;
+        _transfer(msg.sender, zkDistributionWallet, toPledge);
+        _transfer(msg.sender, zkDistributionWallet, toEcosystem);
+        emit WitnessedAction(causeId, actAddress, user);
+    }
+
+
+    /**
+     * @notice Pay a contract fee to a cause with a counterparty and reason.
+     * 10% ecosystem share handled off-chain.
+     * @param counterparty The address of the other party.
+     * @param reason The reason for the contract.
+     * @param causeId The id of the cause.
+     */
+    function contractToCause(address counterparty, string memory reason, uint8 causeId) external {
+        uint256 amount = 0.1 ether;
+        require(balanceOf(msg.sender) >= amount, "Insufficient balance");
+        _transfer(msg.sender, zkDistributionWallet, amount);
+        uint256 causeShareAmount = (amount * 90) / 100;
+        uint256 ecoShareAmount = (amount * 10) / 100;
+        causeShare[causeId] += causeShareAmount;
+        causeEcosystemShare += ecoShareAmount;
+        emit ContractToCause(msg.sender, counterparty, reason, causeId, amount);
     }
 
     /**
-     * @notice Burn tokens to perform a contract action.
+     * @notice Tag a contractId with a causeId. Only callable by founder.
+     * @param contractId The contract identifier.
+     * @param causeId The cause id.
      */
-    function contractAction() external {
-        _burn(msg.sender, burnToContractAmount);
-        seedRegenMint(msg.sender, burnToContractAmount);
-        emit ActionBurned(msg.sender, "contract", burnToContractAmount);
-    }
-
-    /**
-     * @notice Burn tokens to perform a witness action.
-     */
-    function witnessAction() external {
-        _burn(msg.sender, burnToWitnessAmount);
-        seedRegenMint(msg.sender, burnToWitnessAmount);
-        emit ActionBurned(msg.sender, "witnessAction", burnToWitnessAmount);
-    }
-
-    /**
-     * @notice Burn tokens to perform a verify action.
-     */
-    function verifyAction() external {
-        _burn(msg.sender, burnToVerifyAmount);
-        seedRegenMint(msg.sender, burnToVerifyAmount);
-        emit ActionBurned(msg.sender, "verifyAction", burnToVerifyAmount);
+    function tagCauseForContract(uint256 contractId, uint8 causeId) external onlyFounder {
+        contractCauseTags[contractId] = causeId;
+        emit ContractCauseTagged(contractId, causeId);
     }
 
     /**
@@ -741,33 +856,39 @@ contract MAQXToken is
     /**
      * @notice Mint new MAQX based on verified population increase.
      * @param totalAmount The amount to mint for global allocation.
-     * Founder and Dev each get 1% extra on top.
+     * Founder, Dev, and DAO each get 1% extra on top.
      */
     function mintForPopulationIncrease(uint256 totalAmount) external onlyFounder {
-        uint256 founderBonus = (totalAmount * 1) / 100;
-        uint256 devBonus = (totalAmount * 1) / 100;
+        uint256 founderAmount = (totalAmount * 1) / 100;
+        uint256 devAmount = (totalAmount * 1) / 100;
+        uint256 daoAmount = (totalAmount * 1) / 100;
+        uint256 mintableAmount = totalAmount - founderAmount - devAmount - daoAmount;
 
-        _mint(globalMintWallet, totalAmount);
-        _mint(founderWallet, founderBonus);
-        _mint(developerPoolWallet, devBonus);
+        _mint(founderWallet, founderAmount);
+        _mint(developerPoolWallet, devAmount);
+        _mint(daoTreasuryWallet, daoAmount);
+        _mint(globalMintWallet, mintableAmount);
 
-        emit PopulationIncreaseMint(msg.sender, totalAmount, founderBonus, devBonus);
+        emit PopulationIncreaseMint(msg.sender, totalAmount, founderAmount, devAmount);
     }
 
     /**
      * @notice Emergency minting for liquidity restoration or recovery.
      * @param totalAmount The amount to mint for global allocation.
-     * Founder and Dev each get 1% extra on top.
+     * Founder, Dev, and DAO each get 1% extra on top.
      */
     function mintFounderEmergency(uint256 totalAmount) external onlyFounder {
-        uint256 founderBonus = (totalAmount * 1) / 100;
-        uint256 devBonus = (totalAmount * 1) / 100;
+        uint256 founderAmount = (totalAmount * 1) / 100;
+        uint256 devAmount = (totalAmount * 1) / 100;
+        uint256 daoAmount = (totalAmount * 1) / 100;
+        uint256 mintableAmount = totalAmount - founderAmount - devAmount - daoAmount;
 
-        _mint(globalMintWallet, totalAmount);
-        _mint(founderWallet, founderBonus);
-        _mint(developerPoolWallet, devBonus);
+        _mint(founderWallet, founderAmount);
+        _mint(developerPoolWallet, devAmount);
+        _mint(daoTreasuryWallet, daoAmount);
+        _mint(globalMintWallet, mintableAmount);
 
-        emit FounderEmergencyMint(msg.sender, totalAmount, founderBonus, devBonus);
+        emit FounderEmergencyMint(msg.sender, totalAmount, founderAmount, devAmount);
     }
 
     // Optional future modules:
@@ -1010,4 +1131,63 @@ contract MAQXToken is
         lastRegenTimestamp = block.timestamp;
     }
 
+
+
+//  ─────────────────────────────────────────────────────────────
+//  RMR reward system code (commented out for future reactivation)
+/*
+// RMR Tiers logic
+RMRConfig[6] public rmrTiers;
+mapping(address => uint256) public rmrTier;
+mapping(address => uint8) public lastClaimedTier;
+mapping(uint256 => uint256) public tierRewards;
+mapping(address => bool) public tierRewardClaimed;
+event RMRTierChanged(address indexed user, uint256 newTier);
+event TierRewardClaimed(address indexed user, uint8 tier, uint256 amount);
+event TierRewardAmountChanged(uint256 indexed tier, uint256 amount);
+*/
+
+
+    /**
+     * @notice Join a cause by sending a fixed amount to zkDistributionWallet with a cause tag.
+     * @dev Transfers JOIN_AMOUNT to zkDistributionWallet, tracks 90% to causeShare[causeId] and 10% to causeEcosystemShare.
+     * @param causeId The id of the cause to join.
+     */
+    function joinCause(uint8 causeId) external {
+        require(balanceOf(msg.sender) >= JOIN_AMOUNT, "Insufficient balance");
+        _transfer(msg.sender, zkDistributionWallet, JOIN_AMOUNT);
+        uint256 causeShareAmount = (JOIN_AMOUNT * 90) / 100;
+        uint256 ecoShareAmount = (JOIN_AMOUNT * 10) / 100;
+        causeShare[causeId] += causeShareAmount;
+        causeEcosystemShare += ecoShareAmount;
+        emit JoinCause(msg.sender, causeId, JOIN_AMOUNT);
+    }
+
 }
+    /**
+     * @notice Verify an action by burning tokens and emitting a proof event.
+     * @param causeId The id of the cause associated with the action.
+     * @param actAddress The address performing the action.
+     * @param user The user on whose behalf the action is performed.
+     * @param proofHash The proof hash string.
+     */
+    function verifyAction(uint8 causeId, address actAddress, address user, string calldata proofHash) external {
+        uint256 verifyCost = 1 ether;
+        require(ERC20Upgradeable(address(this)).balanceOf(msg.sender) >= verifyCost, "Insufficient MAQX balance");
+
+        uint256 toPledge = verifyCost;
+        uint256 toEcosystem = 0;
+        _transfer(msg.sender, zkDistributionWallet, toPledge);
+        _transfer(msg.sender, zkDistributionWallet, toEcosystem);
+        emit VerifiedAction(causeId, actAddress, user, msg.sender, proofHash);
+    }
+    /**
+     * @notice Central payment logic: sends amount to zkDistributionWallet, tagged by causeId
+     * @param causeId The id of the cause.
+     * @param amount The amount to send.
+     */
+    function _distributePayment(uint8 causeId, uint256 amount) internal {
+        require(balanceOf(msg.sender) >= amount, "Insufficient balance");
+        _transfer(msg.sender, zkDistributionWallet, amount);
+        emit PaymentDistributed(msg.sender, causeId, amount);
+    }
