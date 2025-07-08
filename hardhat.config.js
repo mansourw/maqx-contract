@@ -19,23 +19,14 @@ module.exports = {
       {
         version: "0.8.22",
         settings: {
-          viaIR: false,
+          viaIR: true,
           optimizer: {
             enabled: true,
             runs: 20,
           },
         },
       },
-      {
-        version: "0.8.20",
-        settings: {
-          viaIR: false,
-          optimizer: {
-            enabled: true,
-            runs: 200,
-          },
-        },
-      },
+      
     ],
   },
   defaultNetwork: "zkSyncTestnet",
