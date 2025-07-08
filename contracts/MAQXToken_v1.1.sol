@@ -1,5 +1,3 @@
-
-
 // Reward Fund is topped up manually by the Founder from DEV_POOL_WALLET
 // Used for leaderboard rewards, incentives, etc.
 // NOTE: The immutable address is set in the constructor for upgradeable pattern.
@@ -16,7 +14,11 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "hardhat/console.sol";
 
 interface IZKRegenVerifier {
-    function verifyProof(bytes calldata proof, address[] calldata users, uint256[] calldata amounts) external view returns (bool);
+    function verifyProof(
+        bytes calldata proof,
+        address[] calldata users,
+        uint256[] calldata amounts
+    ) external view returns (bool);
 }
 
 /**
@@ -24,7 +26,7 @@ interface IZKRegenVerifier {
  * @dev Upgradeable ERC20 token with advanced regen and community logic.
  * Inherits OpenZeppelin Initializable, OwnableUpgradeable, UUPSUpgradeable for upgradeability and ownership.
  */
-contract MAQXToken is 
+contract MAQXToken is
     Initializable,
     ERC20Upgradeable,
     ERC20BurnableUpgradeable,
@@ -32,9 +34,17 @@ contract MAQXToken is
     UUPSUpgradeable
 {
     /// @notice Emitted when a user pledges to a cause.
-    event PledgeToCause(address indexed user, uint8 indexed causeId, uint256 amount);
+    event PledgeToCause(
+        address indexed user,
+        uint8 indexed causeId,
+        uint256 amount
+    );
     /// @notice Emitted when a user witnesses to a cause.
-    event witnessedCause(address indexed user, uint8 indexed causeId, uint256 amount);
+    event witnessedCause(
+        address indexed user,
+        uint8 indexed causeId,
+        uint256 amount
+    );
     /// @notice Emitted when a user verifies to a cause.
     // event verifyCause(address indexed user, uint8 indexed causeId, uint256 amount);
     event VerifiedAction(
@@ -45,12 +55,25 @@ contract MAQXToken is
         string proofHash
     );
     /// @notice Emitted when a payment is distributed to zkDistributionWallet for a cause.
-    event PaymentDistributed(address indexed from, uint8 indexed causeId, uint256 amount);
-  
+    event PaymentDistributed(
+        address indexed from,
+        uint8 indexed causeId,
+        uint256 amount
+    );
+
     /// @notice Emitted when a user contracts to a cause.
-    event ContractToCause(address indexed user, address indexed counterparty, string reason, uint8 causeId, uint256 amount);
+    event ContractToCause(
+        address indexed user,
+        address indexed counterparty,
+        string reason,
+        uint8 causeId,
+        uint256 amount
+    );
     /// @notice Emitted when a contract is tagged to a cause.
-    event ContractCauseTagged(uint256 indexed contractId, uint8 indexed causeId);
+    event ContractCauseTagged(
+        uint256 indexed contractId,
+        uint8 indexed causeId
+    );
     /// @notice Emitted when a user joins a cause via joinCause().
     event JoinCause(address indexed user, uint8 causeId, uint256 amount);
     /// @notice Emitted when an action is witnessed (generic).
@@ -68,16 +91,15 @@ contract MAQXToken is
     uint256 public causeEcosystemShare;
     /// @notice Mapping to track the number of joins per causeId.
     mapping(uint8 => uint256) public causeIdToJoinCount;
-    
-    
-    
+
     /// @notice Mapping for contractId => causeId tags.
     mapping(uint256 => uint8) public contractCauseTags;
     /// @notice Immutable reward fund wallet address set at deployment.
     address public immutable REWARD_FUND_WALLET;
 
     /// @notice DAO treasury wallet address for top-up.
-    address public constant DAO_TREASURY_WALLET = 0x5543332C405A3Cbbf7EeeAe91b410FD06213135b;
+    address public constant DAO_TREASURY_WALLET =
+        0x5543332C405A3Cbbf7EeeAe91b410FD06213135b;
 
     /// @notice Emitted when the reward wallet is funded.
     event RewardWalletFunded(uint256 amount);
@@ -127,7 +149,11 @@ contract MAQXToken is
     event RMRTierChanged(address indexed user, uint256 newTier);
     event TierRewardClaimed(address indexed user, uint8 tier, uint256 amount);
     event TierRewardAmountChanged(uint256 indexed tier, uint256 amount);
-    event EventRegenMint(address indexed user, uint256 baseAmount, uint256 finalAmount);
+    event EventRegenMint(
+        address indexed user,
+        uint256 baseAmount,
+        uint256 finalAmount
+    );
     // Event multiplier for event-based minting (basis points, 10000 = 1.0x)
     uint256 public eventMultiplier;
 
@@ -136,7 +162,7 @@ contract MAQXToken is
 
     struct RMRConfig {
         uint256 minDuration; // in days
-        uint256 multiplier;  // in percent
+        uint256 multiplier; // in percent
     }
 
     uint256 public constant INITIAL_SUPPLY = 8_500_000_000 * 1e18;
@@ -228,17 +254,40 @@ contract MAQXToken is
     mapping(address => uint8) public lastClaimedTier;
     mapping(uint256 => uint256) public tierRewards;
 
-    event RegenExecuted(address indexed user, uint256 totalRegen, uint256 userShare, uint256 daoShare, uint256 founderShare, uint256 devShare, uint256 pledgeShare);
+    event RegenExecuted(
+        address indexed user,
+        uint256 totalRegen,
+        uint256 userShare,
+        uint256 daoShare,
+        uint256 founderShare,
+        uint256 devShare,
+        uint256 pledgeShare
+    );
     event SeedGranted(address indexed user);
     event GrantLockedDevToken(address indexed to, uint256 amount);
     event LockedTokensUnlocked(address indexed user);
-    event Gifted(address indexed from, address indexed to, uint256 amount, uint256 reward);
+    event Gifted(
+        address indexed from,
+        address indexed to,
+        uint256 amount,
+        uint256 reward
+    );
 
     // New event for action burns
     event ActionBurned(address indexed user, string actionType, uint256 amount);
 
-    event PopulationIncreaseMint(address indexed by, uint256 amount, uint256 founderBonus, uint256 devBonus);
-    event FounderEmergencyMint(address indexed by, uint256 amount, uint256 founderBonus, uint256 devBonus);
+    event PopulationIncreaseMint(
+        address indexed by,
+        uint256 amount,
+        uint256 founderBonus,
+        uint256 devBonus
+    );
+    event FounderEmergencyMint(
+        address indexed by,
+        uint256 amount,
+        uint256 founderBonus,
+        uint256 devBonus
+    );
 
     event CommitMade(address indexed user, string commitment);
 
@@ -247,7 +296,10 @@ contract MAQXToken is
     mapping(address => uint256) public rmrTier;
 
     modifier rmrEligible(address user) {
-        require(block.timestamp >= lastRegen[user] + rmrInterval, "RMR: interval not met");
+        require(
+            block.timestamp >= lastRegen[user] + rmrInterval,
+            "RMR: interval not met"
+        );
         _;
     }
 
@@ -275,7 +327,9 @@ contract MAQXToken is
     // Updated getRMRMultiplier function with safety guard to prevent out-of-bounds errors
     function getRMRMultiplier(address user) public view returns (uint256) {
         uint256 len = rmrDurations.length;
-        if (len == 0 || rmrBonuses.length != len || rmrMinBalances.length != len) {
+        if (
+            len == 0 || rmrBonuses.length != len || rmrMinBalances.length != len
+        ) {
             return 0;
         }
         uint256 userBalance = balanceOf(user);
@@ -283,7 +337,10 @@ contract MAQXToken is
 
         unchecked {
             for (uint256 i = len - 1; i > 0; i--) {
-                if (heldTime >= rmrDurations[i] && userBalance >= rmrMinBalances[i]) {
+                if (
+                    heldTime >= rmrDurations[i] &&
+                    userBalance >= rmrMinBalances[i]
+                ) {
                     return rmrBonuses[i];
                 }
             }
@@ -291,7 +348,11 @@ contract MAQXToken is
         return rmrBonuses[0];
     }
 
-    function setRMRTierConfig(uint256 tier, uint256 minDurationDays, uint256 multiplier) external onlyOwner {
+    function setRMRTierConfig(
+        uint256 tier,
+        uint256 minDurationDays,
+        uint256 multiplier
+    ) external onlyOwner {
         require(tier >= 1 && tier <= 5, "Tier must be 1-5");
         require(multiplier <= 25, "Max multiplier is 25%");
         rmrTiers[tier] = RMRConfig(minDurationDays, multiplier);
@@ -299,9 +360,16 @@ contract MAQXToken is
 
     function claimTierReward() external {
         uint256 currentTier = rmrTier[msg.sender];
-        require(currentTier > lastClaimedTier[msg.sender], "Already claimed or no new tier");
+        require(
+            currentTier > lastClaimedTier[msg.sender],
+            "Already claimed or no new tier"
+        );
 
-        for (uint256 tier = lastClaimedTier[msg.sender] + 1; tier <= currentTier; tier++) {
+        for (
+            uint256 tier = lastClaimedTier[msg.sender] + 1;
+            tier <= currentTier;
+            tier++
+        ) {
             uint256 reward = tierRewards[tier];
             if (reward > 0) {
                 _transfer(globalMintWallet, msg.sender, reward);
@@ -327,7 +395,7 @@ contract MAQXToken is
     ) public initializer {
         __ERC20_init("MAQX", "MAQX");
         __ERC20Burnable_init();
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
 
         founder = msg.sender;
@@ -381,6 +449,16 @@ contract MAQXToken is
 
         pledgeFundWallet = 0x95Bc0be1892c9B040880A90D4Ef94BD33BCFAEe2;
         pledgeRegenShare = 10;
+    }
+
+    /**
+     * @dev Contract constructor to set the immutable REWARD_FUND_WALLET address.
+     * The actual address is: 0xdbfaBf4cAaAc091aFcf2ECCb8cB0EE10d779428D
+     */
+    constructor() {
+        // Hardcoded reward fund wallet address
+        REWARD_FUND_WALLET = 0xdbfaBf4cAaAc091aFcf2ECCb8cB0EE10d779428D;
+    }
 
     /// @dev zkDistributionWallet must be set by owner after deployment using setZkDistributionWallet
     /**
@@ -389,7 +467,6 @@ contract MAQXToken is
      */
     function setZkDistributionWallet(address _wallet) external onlyOwner {
         zkDistributionWallet = _wallet;
-    }
 
         // Exclude founder and global mint wallet from global transfer cooldown
         _isExcludedFromLimits[owner()] = true;
@@ -406,15 +483,6 @@ contract MAQXToken is
         transferDelay = 5 minutes;
         globalCooldownTime = 300;
         maxSellPercent = 10;
-    }
-
-    /**
-     * @dev Contract constructor to set the immutable REWARD_FUND_WALLET address.
-     * The actual address is: 0xdbfaBf4cAaAc091aFcf2ECCb8cB0EE10d779428D
-     */
-    constructor() {
-        // Hardcoded reward fund wallet address
-        REWARD_FUND_WALLET = 0xdbfaBf4cAaAc091aFcf2ECCb8cB0EE10d779428D;
     }
 
     /**
@@ -440,7 +508,20 @@ contract MAQXToken is
     function rewardTopUsers(address[12] calldata winners) external {
         require(msg.sender == REWARD_FUND_WALLET, "Only reward fund wallet");
         // Distribute: 3x 3 MAQX, 3x 2 MAQX, 6x 1 MAQX = 21 MAQX
-        uint256[12] memory amounts = [uint256(3e18),3e18,3e18,2e18,2e18,2e18,1e18,1e18,1e18,1e18,1e18,1e18];
+        uint256[12] memory amounts = [
+            uint256(3e18),
+            3e18,
+            3e18,
+            2e18,
+            2e18,
+            2e18,
+            1e18,
+            1e18,
+            1e18,
+            1e18,
+            1e18,
+            1e18
+        ];
         for (uint256 i = 0; i < 12; ++i) {
             _transfer(REWARD_FUND_WALLET, winners[i], amounts[i]);
         }
@@ -459,7 +540,9 @@ contract MAQXToken is
     /**
      * @dev Authorize contract upgrades. Only the owner can upgrade.
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 
     /// @notice Grants 1 MAQX to a new user from the Global Mint Wallet
     /// This is a one-time starter token. It is not regenerative.
@@ -472,7 +555,10 @@ contract MAQXToken is
         emit SeedGranted(user);
     }
 
-    function grantEarlyAdoptionToken(address to, uint256 amount) external onlyOwner {
+    function grantEarlyAdoptionToken(
+        address to,
+        uint256 amount
+    ) external onlyOwner {
         _transfer(developerPoolWallet, to, amount);
     }
 
@@ -480,11 +566,17 @@ contract MAQXToken is
         maxSellPercent = _percent;
     }
 
-    function setExcludedFromLimit(address account, bool excluded) external onlyOwner {
+    function setExcludedFromLimit(
+        address account,
+        bool excluded
+    ) external onlyOwner {
         isExcludedFromLimit[account] = excluded;
     }
 
-    function grantLockedDevToken(address to, uint256 amount) external onlyOwner {
+    function grantLockedDevToken(
+        address to,
+        uint256 amount
+    ) external onlyOwner {
         _transfer(developerPoolWallet, to, amount);
         lockedBalance[to] += amount;
         isDevTokenOrigin[to] = true;
@@ -522,7 +614,12 @@ contract MAQXToken is
         uint256 founderAmt = (regenAmount * 4) / 100;
         uint256 devAmt = (regenAmount * 2) / 100;
         uint256 pledgeAmt = (regenAmount * pledgeRegenShare) / 100;
-        uint256 globalAmt = regenAmount - userAmt - daoAmt - founderAmt - devAmt - pledgeAmt;
+        uint256 globalAmt = regenAmount -
+            userAmt -
+            daoAmt -
+            founderAmt -
+            devAmt -
+            pledgeAmt;
 
         // Debug: Output regen split info
         console.log("REGEN_SPLIT");
@@ -546,17 +643,38 @@ contract MAQXToken is
         }
         _mint(globalMintWallet, globalAmt);
 
-        emit RegenExecuted(user, amountBurned, userAmt, daoAmt, founderAmt, devAmt, pledgeAmt);
+        emit RegenExecuted(
+            user,
+            amountBurned,
+            userAmt,
+            daoAmt,
+            founderAmt,
+            devAmt,
+            pledgeAmt
+        );
     }
 
-    function updateWallets(address _dev, address _founder, address _dao) external onlyOwner {
+    function updateWallets(
+        address _dev,
+        address _founder,
+        address _dao
+    ) external onlyOwner {
         developerPoolWallet = _dev;
         founderWallet = _founder;
         daoTreasuryWallet = _dao;
     }
 
-    function updateRegenShares(uint256 userShare, uint256 daoShare, uint256 founderShare, uint256 devShare, uint256 pledgeShare) external onlyOwner {
-        require(userShare + daoShare + founderShare + devShare + pledgeShare == 100, "Invalid shares");
+    function updateRegenShares(
+        uint256 userShare,
+        uint256 daoShare,
+        uint256 founderShare,
+        uint256 devShare,
+        uint256 pledgeShare
+    ) external onlyOwner {
+        require(
+            userShare + daoShare + founderShare + devShare + pledgeShare == 100,
+            "Invalid shares"
+        );
         userRegenShare = userShare;
         daoRegenShare = daoShare;
         founderRegenShare = founderShare;
@@ -581,12 +699,18 @@ contract MAQXToken is
     // ─────────────────────────────────────────────────────────────
     // Regen batching logic
     modifier onlyAfterRegenInterval() {
-        require(block.timestamp >= lastRegenTimestamp + regenInterval, "Regen not yet available");
+        require(
+            block.timestamp >= lastRegenTimestamp + regenInterval,
+            "Regen not yet available"
+        );
         _;
     }
     // Per-user regen interval modifier
     modifier onlyUserRegenInterval(address user) {
-        require(block.timestamp >= lastUserRegen[user] + regenInterval, "User regen not yet available");
+        require(
+            block.timestamp >= lastUserRegen[user] + regenInterval,
+            "User regen not yet available"
+        );
         _;
     }
 
@@ -606,7 +730,10 @@ contract MAQXToken is
      * @dev Event-based regen: accumulate for batch instead of minting directly.
      * Uses a separate pendingEventRegen pool.
      */
-    function eventRegenMint(address user, uint256 baseAmount) external onlyOwner {
+    function eventRegenMint(
+        address user,
+        uint256 baseAmount
+    ) external onlyOwner {
         require(baseAmount > 0, "Invalid amount");
         uint256 finalAmount = (baseAmount * eventMultiplier) / 10000;
         if (!regenUsers[user]) {
@@ -620,14 +747,20 @@ contract MAQXToken is
     function _handleSeedRegen(address user, uint256 totalBurned) internal {
         seedBurned[user] += totalBurned;
         uint256 remaining = (maxSeedRegens * 1e18) - seedRegenerated[user];
-        uint256 toRegen = seedBurned[user] > remaining ? remaining : seedBurned[user];
+        uint256 toRegen = seedBurned[user] > remaining
+            ? remaining
+            : seedBurned[user];
         seedBurned[user] -= toRegen;
         seedRegenerated[user] += toRegen;
         _mint(user, toRegen);
         lockedBalance[user] += toRegen;
     }
 
-    function _calculateUserReward(address user, uint256 normalAmt, uint256 eventAmt) internal view returns (uint256) {
+    function _calculateUserReward(
+        address user,
+        uint256 normalAmt,
+        uint256 eventAmt
+    ) internal view returns (uint256) {
         uint256 baseNormal = (normalAmt * 50) / 100;
         uint256 normalBonus = (baseNormal * getRMRMultiplier(user)) / 100;
         uint256 baseEvent = (eventAmt * 50) / 100;
@@ -635,12 +768,21 @@ contract MAQXToken is
         return baseNormal + normalBonus + baseEvent + eventBonus;
     }
 
-    function _mintRegenShares(address user, uint256 userAmt, uint256 regenAmount) internal {
+    function _mintRegenShares(
+        address user,
+        uint256 userAmt,
+        uint256 regenAmount
+    ) internal {
         uint256 daoAmt = (regenAmount * 4) / 100;
         uint256 founderAmt = (regenAmount * 4) / 100;
         uint256 devAmt = (regenAmount * 2) / 100;
         uint256 pledgeAmt = (regenAmount * pledgeRegenShare) / 100;
-        uint256 globalAmt = regenAmount - userAmt - daoAmt - founderAmt - devAmt - pledgeAmt;
+        uint256 globalAmt = regenAmount -
+            userAmt -
+            daoAmt -
+            founderAmt -
+            devAmt -
+            pledgeAmt;
 
         _mint(user, userAmt);
         if (lockedBalance[user] > 0) {
@@ -655,7 +797,15 @@ contract MAQXToken is
         }
         _mint(globalMintWallet, globalAmt);
 
-        emit RegenExecuted(user, userAmt + daoAmt + founderAmt + devAmt + pledgeAmt + globalAmt, userAmt, daoAmt, founderAmt, devAmt, pledgeAmt);
+        emit RegenExecuted(
+            user,
+            userAmt + daoAmt + founderAmt + devAmt + pledgeAmt + globalAmt,
+            userAmt,
+            daoAmt,
+            founderAmt,
+            devAmt,
+            pledgeAmt
+        );
     }
 
     function _finalizeRegenBatch(address user) internal {
@@ -677,7 +827,10 @@ contract MAQXToken is
 
         _updateRMRTier(user);
 
-        if (hasReceivedSeed[user] && seedRegenerated[user] < maxSeedRegens * 1e18) {
+        if (
+            hasReceivedSeed[user] &&
+            seedRegenerated[user] < maxSeedRegens * 1e18
+        ) {
             _handleSeedRegen(user, totalBurned);
         } else {
             uint256 decayedAmt = (totalBurned * regenDecayShare) / 100;
@@ -692,27 +845,43 @@ contract MAQXToken is
 
     // _processUserRegen is no longer used by batch logic, but may remain for internal use if needed.
 
-    function transferWithOptionalLock(address to, uint256 amount, bool lock, uint256 lockDurationDays) external {
+    function transferWithOptionalLock(
+        address to,
+        uint256 amount,
+        bool lock,
+        uint256 lockDurationDays
+    ) external {
         _transfer(msg.sender, to, amount);
         if (lock && lockDurationDays > 0) {
             lockedUntil[to] = block.timestamp + (lockDurationDays * 1 days);
         }
     }
 
-    function _update(address /*from*/, address /*to*/, uint256 value) internal override {
+    function _update(
+        address /*from*/,
+        address /*to*/,
+        uint256 value
+    ) internal override {
         // ─────────────────────────────────────────────────────────────
         // Global transfer cooldown: enforce delay between transfers unless excluded
         address from = msg.sender;
         address to = address(0); // Not used, but kept for signature compatibility
         if (from != address(0) && !_isExcludedFromLimits[from]) {
-            require(block.timestamp - _lastTransferTimestamp[from] >= globalCooldownTime, "Global cooldown: wait before next transfer");
+            require(
+                block.timestamp - _lastTransferTimestamp[from] >=
+                    globalCooldownTime,
+                "Global cooldown: wait before next transfer"
+            );
             _lastTransferTimestamp[from] = block.timestamp;
         }
         // SELL COOLDOWN and LP SELL LIMIT: Exclude owner from these rules
         if (from != owner()) {
             if (uniswapV2Pair != address(0)) {
                 if (to == uniswapV2Pair && from != address(0)) {
-                    require(block.timestamp > lastBuyTimestamp[from] + sellCooldown, "Sell cooldown active");
+                    require(
+                        block.timestamp > lastBuyTimestamp[from] + sellCooldown,
+                        "Sell cooldown active"
+                    );
                     uint256 pairBalance = balanceOf(uniswapV2Pair);
                     uint256 maxSellAmount = (pairBalance * 10) / 100;
                     require(value <= maxSellAmount, "Exceeds max sell amount");
@@ -727,7 +896,10 @@ contract MAQXToken is
             // DEBUG: transfer lock check
             console.log("DEBUG: balance", balanceOf(from));
             console.log("DEBUG: locked", lockedBalance[from]);
-            console.log("DEBUG: unlocked", balanceOf(from) - lockedBalance[from]);
+            console.log(
+                "DEBUG: unlocked",
+                balanceOf(from) - lockedBalance[from]
+            );
             console.log("DEBUG: attempting transfer", value);
             require(value <= unlocked, "Cannot transfer locked tokens");
         }
@@ -740,19 +912,22 @@ contract MAQXToken is
         }
 
         uint256 len = rmrDurations.length;
-        if (len == 0 || rmrBonuses.length != len || rmrMinBalances.length != len) {
+        if (
+            len == 0 || rmrBonuses.length != len || rmrMinBalances.length != len
+        ) {
             return;
         }
 
         uint256 newBalance = balanceOf(to);
         uint256 currentTier = getRMRMultiplier(to);
 
-        if (currentTier < rmrMinBalances.length && newBalance < rmrMinBalances[currentTier]) {
+        if (
+            currentTier < rmrMinBalances.length &&
+            newBalance < rmrMinBalances[currentTier]
+        ) {
             rmrStartTime[to] = block.timestamp;
         }
     }
-
-
 
     function gift(address to, uint256 amount) external {
         _transfer(msg.sender, to, amount);
@@ -765,7 +940,9 @@ contract MAQXToken is
 
         // Reward is 2% of gifted amount
         uint256 reward = (amount * 2) / 100;
-        uint256 allowedReward = reward <= giftRewardQuota[msg.sender] ? reward : giftRewardQuota[msg.sender];
+        uint256 allowedReward = reward <= giftRewardQuota[msg.sender]
+            ? reward
+            : giftRewardQuota[msg.sender];
 
         if (allowedReward > 0) {
             _transfer(globalMintWallet, msg.sender, allowedReward);
@@ -803,7 +980,11 @@ contract MAQXToken is
      * @param actAddress The address performing the action.
      * @param user The user on whose behalf the action is performed.
      */
-    function witnessCause(uint8 causeId, address actAddress, address user) external {
+    function witnessCause(
+        uint8 causeId,
+        address actAddress,
+        address user
+    ) external {
         uint256 witnessBurnAmount = 0.1 ether;
         _burn(msg.sender, witnessBurnAmount);
         uint256 toPledge = (witnessBurnAmount * 90) / 100;
@@ -813,7 +994,6 @@ contract MAQXToken is
         emit WitnessedAction(causeId, actAddress, user);
     }
 
-
     /**
      * @notice Pay a contract fee to a cause with a counterparty and reason.
      * 10% ecosystem share handled off-chain.
@@ -821,7 +1001,11 @@ contract MAQXToken is
      * @param reason The reason for the contract.
      * @param causeId The id of the cause.
      */
-    function contractToCause(address counterparty, string memory reason, uint8 causeId) external {
+    function contractToCause(
+        address counterparty,
+        string memory reason,
+        uint8 causeId
+    ) external {
         uint256 amount = 0.1 ether;
         require(balanceOf(msg.sender) >= amount, "Insufficient balance");
         _transfer(msg.sender, zkDistributionWallet, amount);
@@ -837,7 +1021,10 @@ contract MAQXToken is
      * @param contractId The contract identifier.
      * @param causeId The cause id.
      */
-    function tagCauseForContract(uint256 contractId, uint8 causeId) external onlyFounder {
+    function tagCauseForContract(
+        uint256 contractId,
+        uint8 causeId
+    ) external onlyFounder {
         contractCauseTags[contractId] = causeId;
         emit ContractCauseTagged(contractId, causeId);
     }
@@ -858,18 +1045,28 @@ contract MAQXToken is
      * @param totalAmount The amount to mint for global allocation.
      * Founder, Dev, and DAO each get 1% extra on top.
      */
-    function mintForPopulationIncrease(uint256 totalAmount) external onlyFounder {
+    function mintForPopulationIncrease(
+        uint256 totalAmount
+    ) external onlyFounder {
         uint256 founderAmount = (totalAmount * 1) / 100;
         uint256 devAmount = (totalAmount * 1) / 100;
         uint256 daoAmount = (totalAmount * 1) / 100;
-        uint256 mintableAmount = totalAmount - founderAmount - devAmount - daoAmount;
+        uint256 mintableAmount = totalAmount -
+            founderAmount -
+            devAmount -
+            daoAmount;
 
         _mint(founderWallet, founderAmount);
         _mint(developerPoolWallet, devAmount);
         _mint(daoTreasuryWallet, daoAmount);
         _mint(globalMintWallet, mintableAmount);
 
-        emit PopulationIncreaseMint(msg.sender, totalAmount, founderAmount, devAmount);
+        emit PopulationIncreaseMint(
+            msg.sender,
+            totalAmount,
+            founderAmount,
+            devAmount
+        );
     }
 
     /**
@@ -881,14 +1078,22 @@ contract MAQXToken is
         uint256 founderAmount = (totalAmount * 1) / 100;
         uint256 devAmount = (totalAmount * 1) / 100;
         uint256 daoAmount = (totalAmount * 1) / 100;
-        uint256 mintableAmount = totalAmount - founderAmount - devAmount - daoAmount;
+        uint256 mintableAmount = totalAmount -
+            founderAmount -
+            devAmount -
+            daoAmount;
 
         _mint(founderWallet, founderAmount);
         _mint(developerPoolWallet, devAmount);
         _mint(daoTreasuryWallet, daoAmount);
         _mint(globalMintWallet, mintableAmount);
 
-        emit FounderEmergencyMint(msg.sender, totalAmount, founderAmount, devAmount);
+        emit FounderEmergencyMint(
+            msg.sender,
+            totalAmount,
+            founderAmount,
+            devAmount
+        );
     }
 
     // Optional future modules:
@@ -902,10 +1107,16 @@ contract MAQXToken is
 
     /// @notice Sends MAQX from the Global Pledge Fund Wallet to a specified recipient.
     /// This allows the founder to fund approved community or impact projects manually.
-    function spendFromPledgeFund(address to, uint256 amount, string calldata reason) external onlyOwner {
+    function spendFromPledgeFund(
+        address to,
+        uint256 amount,
+        string calldata reason
+    ) external onlyOwner {
         require(to != address(0), "Invalid recipient");
         uint256 pledgeBalance = balanceOf(pledgeFundWallet);
-        uint256 unlocked = pledgeBalance > pledgeFromSeedDerived ? pledgeBalance - pledgeFromSeedDerived : 0;
+        uint256 unlocked = pledgeBalance > pledgeFromSeedDerived
+            ? pledgeBalance - pledgeFromSeedDerived
+            : 0;
         require(unlocked >= amount, "Insufficient unlocked pledge funds");
         _transfer(pledgeFundWallet, to, amount);
         emit PledgeFundSpent(to, amount, reason);
@@ -943,7 +1154,11 @@ contract MAQXToken is
      * @param users The list of user addresses to mint to.
      * @param amounts The corresponding regen amounts per user.
      */
-    function mintFromZKProof(bytes calldata proof, address[] calldata users, uint256[] calldata amounts) external onlyOwner {
+    function mintFromZKProof(
+        bytes calldata proof,
+        address[] calldata users,
+        uint256[] calldata amounts
+    ) external onlyOwner {
         require(users.length == amounts.length, "Mismatched input lengths");
         require(zkVerifier != IZKRegenVerifier(address(0)), "Verifier not set");
 
@@ -969,11 +1184,22 @@ contract MAQXToken is
 
             _updateRMRTier(user);
 
-            if (hasReceivedSeed[user] && seedRegenerated[user] < maxSeedRegens * 1e18) {
+            if (
+                hasReceivedSeed[user] &&
+                seedRegenerated[user] < maxSeedRegens * 1e18
+            ) {
                 // Seed user with remaining regen: handle locked minting and update tracking
                 _handleSeedRegen(user, amountBurned);
                 // For seed users, emit RegenExecuted event with only the amount minted to user (locked), others are zero
-                emit RegenExecuted(user, amountBurned, amountBurned, 0, 0, 0, 0);
+                emit RegenExecuted(
+                    user,
+                    amountBurned,
+                    amountBurned,
+                    0,
+                    0,
+                    0,
+                    0
+                );
             } else {
                 // Normal user: apply decay, calculate split, accumulate for batch minting
                 uint256 decayedAmt = (amountBurned * regenDecayShare) / 100;
@@ -1003,8 +1229,14 @@ contract MAQXToken is
                 uint256 pledgeRegenAmount = (totalRegenAmount * 10) / 100;
                 totalPledgeRegen += pledgeRegenAmount;
                 // Remaining to Global Mint Wallet
-                uint256 allocated = userRegenAmount + founderRegenAmount + daoRegenAmount + devRegenAmount + pledgeRegenAmount;
-                uint256 globalMintRegenAmount = totalRegenAmount > allocated ? totalRegenAmount - allocated : 0;
+                uint256 allocated = userRegenAmount +
+                    founderRegenAmount +
+                    daoRegenAmount +
+                    devRegenAmount +
+                    pledgeRegenAmount;
+                uint256 globalMintRegenAmount = totalRegenAmount > allocated
+                    ? totalRegenAmount - allocated
+                    : 0;
                 totalGlobalMintRegen += globalMintRegenAmount;
 
                 emit RegenExecuted(
@@ -1029,7 +1261,8 @@ contract MAQXToken is
         if (totalDAORegen > 0) _mint(daoTreasuryWallet, totalDAORegen);
         if (totalDevRegen > 0) _mint(developerPoolWallet, totalDevRegen);
         if (totalPledgeRegen > 0) _mint(pledgeFundWallet, totalPledgeRegen);
-        if (totalGlobalMintRegen > 0) _mint(globalMintWallet, totalGlobalMintRegen);
+        if (totalGlobalMintRegen > 0)
+            _mint(globalMintWallet, totalGlobalMintRegen);
 
         lastRegenTimestamp = block.timestamp;
     }
@@ -1075,7 +1308,9 @@ contract MAQXToken is
     */
 
     // Regen share calculation helper for batch regen (internal modularization)
-    function _calculateRegenShares(address user)
+    function _calculateRegenShares(
+        address user
+    )
         internal
         view
         returns (
@@ -1093,11 +1328,11 @@ contract MAQXToken is
         //     regenAmt = regenCap;
         // }
 
-        daoAmt     = (regenAmt * daoRegenShare) / 100;
-        devAmt     = (regenAmt * devRegenShare) / 100;
+        daoAmt = (regenAmt * daoRegenShare) / 100;
+        devAmt = (regenAmt * devRegenShare) / 100;
         founderAmt = (regenAmt * founderRegenShare) / 100;
-        pledgeAmt  = (regenAmt * pledgeRegenShare) / 100;
-        globalAmt  = regenAmt - (daoAmt + devAmt + founderAmt + pledgeAmt);
+        pledgeAmt = (regenAmt * pledgeRegenShare) / 100;
+        globalAmt = regenAmt - (daoAmt + devAmt + founderAmt + pledgeAmt);
     }
 
     function regenAllEligible() external onlyOwner onlyAfterRegenInterval {
@@ -1115,7 +1350,8 @@ contract MAQXToken is
             // if (regenAmt > regenCap) {
             //     regenAmt = regenCap;
             // }
-            uint256 userAmt = regenAmt - (daoAmt + devAmt + founderAmt + pledgeAmt + globalAmt);
+            uint256 userAmt = regenAmt -
+                (daoAmt + devAmt + founderAmt + pledgeAmt + globalAmt);
             if (userAmt > 0) _mint(user, userAmt);
             if (daoAmt > 0) _mint(daoTreasuryWallet, daoAmt);
             if (devAmt > 0) _mint(developerPoolWallet, devAmt);
@@ -1123,7 +1359,15 @@ contract MAQXToken is
             if (pledgeAmt > 0) _mint(pledgeFundWallet, pledgeAmt);
             if (globalAmt > 0) _mint(globalMintWallet, globalAmt);
 
-            emit RegenMinted(user, userAmt, daoAmt, devAmt, founderAmt, pledgeAmt, globalAmt);
+            emit RegenMinted(
+                user,
+                userAmt,
+                daoAmt,
+                devAmt,
+                founderAmt,
+                pledgeAmt,
+                globalAmt
+            );
 
             pendingRegen[user] = 0;
         }
@@ -1131,11 +1375,9 @@ contract MAQXToken is
         lastRegenTimestamp = block.timestamp;
     }
 
-
-
-//  ─────────────────────────────────────────────────────────────
-//  RMR reward system code (commented out for future reactivation)
-/*
+    //  ─────────────────────────────────────────────────────────────
+    //  RMR reward system code (commented out for future reactivation)
+    /*
 // RMR Tiers logic
 RMRConfig[6] public rmrTiers;
 mapping(address => uint256) public rmrTier;
@@ -1146,7 +1388,6 @@ event RMRTierChanged(address indexed user, uint256 newTier);
 event TierRewardClaimed(address indexed user, uint8 tier, uint256 amount);
 event TierRewardAmountChanged(uint256 indexed tier, uint256 amount);
 */
-
 
     /**
      * @notice Join a cause by sending a fixed amount to zkDistributionWallet with a cause tag.
@@ -1163,7 +1404,6 @@ event TierRewardAmountChanged(uint256 indexed tier, uint256 amount);
         emit JoinCause(msg.sender, causeId, JOIN_AMOUNT);
     }
 
-}
     /**
      * @notice Verify an action by burning tokens and emitting a proof event.
      * @param causeId The id of the cause associated with the action.
@@ -1171,9 +1411,17 @@ event TierRewardAmountChanged(uint256 indexed tier, uint256 amount);
      * @param user The user on whose behalf the action is performed.
      * @param proofHash The proof hash string.
      */
-    function verifyAction(uint8 causeId, address actAddress, address user, string calldata proofHash) external {
+    function verifyAction(
+        uint8 causeId,
+        address actAddress,
+        address user,
+        string calldata proofHash
+    ) external {
         uint256 verifyCost = 1 ether;
-        require(ERC20Upgradeable(address(this)).balanceOf(msg.sender) >= verifyCost, "Insufficient MAQX balance");
+        require(
+            ERC20Upgradeable(address(this)).balanceOf(msg.sender) >= verifyCost,
+            "Insufficient MAQX balance"
+        );
 
         uint256 toPledge = verifyCost;
         uint256 toEcosystem = 0;
@@ -1191,3 +1439,4 @@ event TierRewardAmountChanged(uint256 indexed tier, uint256 amount);
         _transfer(msg.sender, zkDistributionWallet, amount);
         emit PaymentDistributed(msg.sender, causeId, amount);
     }
+}
