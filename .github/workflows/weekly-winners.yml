@@ -1,0 +1,24 @@
+name: Weekly Winners Scheduler
+
+on:
+  schedule:
+    - cron: '0 8 * * 0' # Every Sunday 08:00 UTC = Sunday 10:00 CET
+  workflow_dispatch:
+
+jobs:
+  run-winners:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run setWeeklyWinners
+        run: npx ts-node cron/setWinners.ts
